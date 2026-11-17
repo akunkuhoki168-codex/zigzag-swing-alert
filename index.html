@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b0e11">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Live 1-minute ADX alerts on Binance USD-M Futures mid-caps.">
+  <meta name="description" content="Live ADX alerts on Binance USD-M Futures mid-caps, with 1m to 4h timeframes.">
   <title>ADX Swing Alert</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect rx='12' width='64' height='64' fill='%230b0e11'/%3E%3Cpath d='M12 40 L26 24 L38 34 L52 16' stroke='%230ecb81' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <style>
@@ -92,14 +92,36 @@
     .status.wait { color: var(--warn); }
     .status.err .dot { background: var(--short); }
     .status.err { color: var(--short); }
+    .filters {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .filter-label {
+      flex: 0 0 36px;
+      color: var(--dim);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
     .symbols {
       display: flex;
       gap: 8px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
-      margin: 0 0 12px;
+      margin: 0;
       padding: 2px 0;
+      flex: 1;
+      min-width: 0;
     }
     .symbols::-webkit-scrollbar { display: none; }
     .symbols button {
@@ -280,12 +302,21 @@
   <header>
     <div>
       <h1>ADX Swing Alert</h1>
-      <p class="sub">Binance USD-M Futures · 1-minute candles · ADX(14)</p>
+      <p class="sub" id="subtitle">Binance USD-M Futures · 15m candles · ADX(14)</p>
     </div>
     <div id="status" class="status wait" role="status"><span class="dot"></span><span id="status-text">Loading</span></div>
   </header>
 
-  <nav class="symbols" id="symbols" aria-label="Symbols"></nav>
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-label">Coin</span>
+      <nav class="symbols" id="symbols" aria-label="Symbols"></nav>
+    </div>
+    <div class="filter-row">
+      <span class="filter-label">TF</span>
+      <nav class="symbols" id="timeframes" aria-label="Timeframes"></nav>
+    </div>
+  </div>
 
   <section class="stats" id="stats" aria-label="Latest values">
     <div class="stat"><div class="lbl">Price</div><div class="val" id="st-price">—</div></div>

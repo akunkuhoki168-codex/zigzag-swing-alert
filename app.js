@@ -9,8 +9,15 @@
   var RETRIES = 8;
   var RETRY_MS = 1500;
 
-  var symbol = A.normalizeSymbol(new URLSearchParams(location.search).get("symbol")) || "NEARUSDT";
+  var params = new URLSearchParams(location.search);
+  var symbol = A.normalizeSymbol(params.get("symbol")) || "NEARUSDT";
+  var tf = A.normalizeTimeframe(params.get("tf"));
+  if (!tf) {
+    try { tf = A.normalizeTimeframe(localStorage.getItem(A.TF_STORAGE_KEY)); } catch (e) {}
+  }
+  if (!tf) tf = A.TF;
   var klines = [];
+  var loadGen = 0;
   var chart, candleSeries, adxSeries, pdiSeries, mdiSeries, levelSeries, markersApi, adxPane;
   var ws = null;
   var wsRetry = 0;
@@ -19,6 +26,8 @@
 
   var el = {
     symbols: document.getElementById("symbols"),
+    timeframes: document.getElementById("timeframes"),
+    subtitle: document.getElementById("subtitle"),
     status: document.getElementById("status"),
     statusText: document.getElementById("status-text"),
     chart: document.getElementById("chart"),
@@ -39,11 +48,11 @@
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
-  async function fetchKlines(sym) {
+  async function fetchKlines(sym, interval) {
     var err;
     for (var attempt = 0; attempt < RETRIES; attempt++) {
       try {
-        var res = await fetch(KLINES_URL + "?symbol=" + encodeURIComponent(sym) + "&interval=1m&limit=" + LIMIT, { cache: "no-store" });
+        var res = await fetch(KLINES_URL + "?symbol=" + encodeURIComponent(sym) + "&interval=" + encodeURIComponent(interval) + "&limit=" + LIMIT, { cache: "no-store" });
         if (!res.ok) throw new Error("HTTP " + res.status);
         var data = await res.json();
         if (!Array.isArray(data) || !data.length) throw new Error("empty klines");
@@ -119,6 +128,7 @@
         secondsVisible: false,
         tickMarkFormatter: function (time) {
           var p = wibParts(time);
+          if (tf === "1h" || tf === "4h") return p.day + " " + p.clock;
           return p.clock;
         },
       },
@@ -259,7 +269,7 @@
 
   function renderList(signals, dec) {
     if (!signals.length) {
-      el.signals.innerHTML = '<div class="empty">No ADX signals in the last ' + klines.length + ' one-minute candles.</div>';
+      el.signals.innerHTML = '<div class="empty">No ADX signals in the last ' + klines.length + ' ' + tf + ' candles.</div>';
       return;
     }
     var rows = signals.slice().reverse();
@@ -296,15 +306,15 @@
     }
   }
 
-  function connectWs(sym) {
+  function connectWs(sym, interval) {
     closeWs();
-    var stream = sym.toLowerCase() + "@kline_1m";
+    var stream = sym.toLowerCase() + "@kline_" + interval;
     var sock;
     try {
       sock = new WebSocket(WS_URL + "/" + stream);
     } catch (e) {
       setStatus("err", "Socket error");
-      scheduleWs(sym);
+      scheduleWs(sym, interval);
       return;
     }
     ws = sock;
@@ -327,18 +337,18 @@
     sock.onclose = function () {
       if (ws !== sock || destroyed) return;
       setStatus("wait", "Reconnecting");
-      scheduleWs(sym);
+      scheduleWs(sym, interval);
     };
     sock.onerror = function () {
       try { sock.close(); } catch (e) {}
     };
   }
 
-  function scheduleWs(sym) {
+  function scheduleWs(sym, interval) {
     wsRetry += 1;
     var wait = Math.min(15000, 1000 * Math.pow(1.6, Math.min(wsRetry, 8)));
     setTimeout(function () {
-      if (!destroyed && symbol === sym) connectWs(sym);
+      if (!destroyed && symbol === sym && tf === interval) connectWs(sym, interval);
     }, wait);
   }
 
@@ -350,37 +360,58 @@
     try { old.close(); } catch (e) {}
   }
 
-  function setUrl(sym) {
+  function setUrl() {
     var next = new URL(location.href);
-    next.searchParams.set("symbol", sym);
+    next.searchParams.set("symbol", symbol);
+    next.searchParams.set("tf", tf);
     history.replaceState(null, "", next.pathname + next.search + next.hash);
+  }
+
+  function persistTf(interval) {
+    tf = interval;
+    try { localStorage.setItem(A.TF_STORAGE_KEY, interval); } catch (e) {}
   }
 
   function highlight() {
     var buttons = el.symbols.querySelectorAll("button");
-    for (var i = 0; i < buttons.length; i++) {
+    var i;
+    for (i = 0; i < buttons.length; i++) {
       buttons[i].setAttribute("aria-pressed", buttons[i].dataset.symbol === symbol ? "true" : "false");
+    }
+    if (el.timeframes) {
+      buttons = el.timeframes.querySelectorAll("button");
+      for (i = 0; i < buttons.length; i++) {
+        buttons[i].setAttribute("aria-pressed", buttons[i].dataset.tf === tf ? "true" : "false");
+      }
+    }
+    if (el.subtitle) {
+      el.subtitle.textContent = "Binance USD-M Futures · " + tf + " candles · ADX(14)";
     }
   }
 
-  async function load(sym, pushUrl) {
+  async function load(sym, interval, pushUrl) {
+    var gen = ++loadGen;
     symbol = sym;
+    persistTf(interval);
     highlight();
-    if (pushUrl !== false) setUrl(sym);
+    if (pushUrl !== false) setUrl();
     setStatus("wait", "Loading");
-    el.msg.textContent = "Loading " + A.shortName(sym) + " candles…";
+    el.msg.textContent = "Loading " + A.shortName(sym) + " " + interval + " candles…";
     el.msg.style.display = "flex";
     closeWs();
     try {
-      klines = await fetchKlines(sym);
+      var data = await fetchKlines(sym, interval);
+      if (gen !== loadGen) return;
+      klines = data;
       render(klines, false);
       setStatus("wait", "Connecting");
-      connectWs(sym);
+      connectWs(sym, interval);
     } catch (e) {
+      if (gen !== loadGen) return;
       el.msg.textContent = "Could not load Binance Futures candles. Retrying may help if fapi is briefly blocked.";
       el.msg.style.display = "flex";
       setStatus("err", "Fetch failed");
-      setTimeout(function () { if (symbol === sym) load(sym, false); }, 4000);
+      setTimeout(function () { if (symbol === sym && tf === interval) load(sym, interval, false); }, 4000);
     }
   }
 
@@ -393,9 +424,21 @@
       b.dataset.symbol = sym;
       b.setAttribute("aria-pressed", sym === symbol ? "true" : "false");
       b.addEventListener("click", function () {
-        if (sym !== symbol) load(sym);
+        if (sym !== symbol) load(sym, tf);
       });
       el.symbols.appendChild(b);
+    });
+    el.timeframes.innerHTML = "";
+    A.TIMEFRAMES.forEach(function (interval) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = interval;
+      b.dataset.tf = interval;
+      b.setAttribute("aria-pressed", interval === tf ? "true" : "false");
+      b.addEventListener("click", function () {
+        if (interval !== tf) load(symbol, interval);
+      });
+      el.timeframes.appendChild(b);
     });
   }
 
@@ -409,5 +452,5 @@
   }
   buildSwitcher();
   buildChart();
-  load(symbol, true);
+  load(symbol, tf, true);
 })();

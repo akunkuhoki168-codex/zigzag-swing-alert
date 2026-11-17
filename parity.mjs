@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Fetch the same Binance USD-M 1m klines used by the dashboard, then compare
- * adx.js (browser/Node) against a faithful port of /workspace/adx/scan.py.
+ * Fetch the same Binance USD-M klines used by the dashboard (default 15m, matching
+ * scan.py), then compare adx.js against a faithful port of /workspace/adx/scan.py.
  */
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { createRequire } from "module";
@@ -13,16 +13,17 @@ const AdxAlert = require("./adx.js");
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const COINS = AdxAlert.COINS;
+const TF = AdxAlert.normalizeTimeframe(process.env.TF || process.argv[3]) || AdxAlert.TF;
 const LIMIT = 500;
 const N = 14;
-const cachePath = process.argv[2] || join(__dirname, ".parity-klines.json");
+const cachePath = process.argv[2] || join(__dirname, `.parity-klines-${TF}.json`);
 
 async function fetchKlines(symbol) {
   let err;
   for (let i = 0; i < 8; i++) {
     try {
       const res = await fetch(
-        `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1m&limit=${LIMIT}`
+        `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${TF}&limit=${LIMIT}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
@@ -97,6 +98,7 @@ function fmtWib(closeTime) {
 }
 
 async function main() {
+  console.log(`Parity vs scan.py math on ${TF}, limit=${LIMIT}`);
   let store;
   if (existsSync(cachePath) && process.argv[2]) {
     store = JSON.parse(readFileSync(cachePath, "utf8"));
@@ -104,7 +106,7 @@ async function main() {
     store = {};
     for (const s of COINS) {
       store[s] = await fetchKlines(s);
-      process.stderr.write(`fetched ${s} ${store[s].length} klines\n`);
+      process.stderr.write(`fetched ${s} ${TF} ${store[s].length} klines\n`);
     }
     writeFileSync(cachePath, JSON.stringify(store));
   }
@@ -183,10 +185,14 @@ async function main() {
     }
   }
 
-  if (nearShorts.length) {
-    console.log("NEAR SHORT around 13:03 WIB on 17 Nov 2026: FOUND");
+  if (TF === "1m") {
+    if (nearShorts.length) {
+      console.log("NEAR SHORT around 13:03 WIB on 17 Nov 2026: FOUND");
+    } else {
+      console.log("NEAR SHORT around 13:03 WIB on 17 Nov 2026: NOT IN RANGE (klines may have rolled off)");
+    }
   } else {
-    console.log("NEAR SHORT around 13:03 WIB on 17 Nov 2026: NOT IN RANGE (klines may have rolled off)");
+    console.log(`Timeframe under test: ${TF} (scan.py default is 15m)`);
   }
 
   if (failed) {

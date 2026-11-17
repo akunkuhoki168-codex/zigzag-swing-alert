@@ -6,7 +6,7 @@ from pathlib import Path
 
 N = 14
 WIB = timezone(timedelta(hours=7))
-cache = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).parent / ".parity-klines.json")
+cache = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).parent / ".parity-klines-15m.json")
 
 def wilder(x, n):
     out = [None] * len(x)

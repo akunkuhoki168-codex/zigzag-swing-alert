@@ -1,4 +1,4 @@
-/* ADX(14) + DMI with Wilder smoothing. Must stay in lockstep with the 1-minute ADX scanner (Wilder ADX/DMI). */
+/* ADX(14) + DMI with Wilder smoothing. Must stay in lockstep with the ADX scanner (Wilder ADX/DMI). */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
   else root.AdxAlert = factory();
@@ -6,7 +6,9 @@
   "use strict";
 
   var COINS = ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"];
-  var TF = "1m";
+  var TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
+  var TF = "15m";
+  var TF_STORAGE_KEY = "adx-alert-tf";
   var N = 14;
   var ADX_LEVEL = 25;
 
@@ -173,13 +175,30 @@
     return null;
   }
 
+  function normalizeTimeframe(raw) {
+    if (!raw) return null;
+    var s = String(raw).trim().toLowerCase();
+    if (s === "15" || s === "15min") s = "15m";
+    if (s === "5" || s === "5min") s = "5m";
+    if (s === "1" || s === "1min") s = "1m";
+    if (s === "60" || s === "60m") s = "1h";
+    if (s === "240" || s === "240m") s = "4h";
+    return TIMEFRAMES.indexOf(s) !== -1 ? s : null;
+  }
+
+  function tfLabel(interval) {
+    return interval || TF;
+  }
+
   function shortName(symbol) {
     return String(symbol).replace(/USDT$/, "");
   }
 
   return {
     COINS: COINS,
+    TIMEFRAMES: TIMEFRAMES,
     TF: TF,
+    TF_STORAGE_KEY: TF_STORAGE_KEY,
     N: N,
     ADX_LEVEL: ADX_LEVEL,
     wilder: wilder,
@@ -190,6 +209,8 @@
     round1: round1,
     formatWib: formatWib,
     normalizeSymbol: normalizeSymbol,
+    normalizeTimeframe: normalizeTimeframe,
+    tfLabel: tfLabel,
     shortName: shortName,
   };
 });
