@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e11">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Live 1-minute ADX alerts on Binance USD-M Futures mid-caps.">
+  <title>ADX Swing Alert</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect rx='12' width='64' height='64' fill='%230b0e11'/%3E%3Cpath d='M12 40 L26 24 L38 34 L52 16' stroke='%230ecb81' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --bg: #0b0e11;
+      --bg-elev: #12161c;
+      --bg-elev-2: #181e27;
+      --line: #1e2530;
+      --text: #e8edf2;
+      --muted: #8b949e;
+      --dim: #5b6570;
+      --long: #0ecb81;
+      --long-bg: rgba(14, 203, 129, 0.12);
+      --short: #f6465d;
+      --short-bg: rgba(246, 70, 93, 0.12);
+      --adx: #f0c14b;
+      --pdi: #0ecb81;
+      --mdi: #f6465d;
+      --live: #0ecb81;
+      --warn: #f0c14b;
+      --radius: 14px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
+      min-height: 100%;
+    }
+    body {
+      padding: calc(12px + var(--safe-top)) 12px calc(16px + var(--safe-bottom));
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .sub {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+    .status {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .status .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--dim);
+    }
+    .status.live .dot { background: var(--live); box-shadow: 0 0 0 3px rgba(14, 203, 129, 0.18); }
+    .status.live { color: var(--live); }
+    .status.wait .dot { background: var(--warn); }
+    .status.wait { color: var(--warn); }
+    .status.err .dot { background: var(--short); }
+    .status.err { color: var(--short); }
+    .symbols {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      margin: 0 0 12px;
+      padding: 2px 0;
+    }
+    .symbols::-webkit-scrollbar { display: none; }
+    .symbols button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--bg-elev);
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .symbols button[aria-pressed="true"] {
+      background: #e8edf2;
+      color: #0b0e11;
+      border-color: #e8edf2;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stat {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 10px;
+      min-width: 0;
+    }
+    .stat .lbl {
+      color: var(--dim);
+      font-size: 0.65rem;
+      font-weight: 650;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .stat .val {
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 650;
+      font-size: 0.95rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stat .val.long { color: var(--long); }
+    .stat .val.short { color: var(--short); }
+    .chart-wrap {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      height: min(62vh, 560px);
+      min-height: 320px;
+      position: relative;
+    }
+    #chart { width: 100%; height: 100%; }
+    .chart-msg {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+      pointer-events: none;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      margin: 8px 2px 14px;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch {
+      width: 10px;
+      height: 2px;
+      border-radius: 1px;
+      background: currentColor;
+    }
+    .swatch.dash { background: repeating-linear-gradient(90deg, #8b949e 0 4px, transparent 4px 7px); height: 2px; width: 14px; }
+    .swatch.adx { background: var(--adx); }
+    .swatch.pdi { background: var(--pdi); }
+    .swatch.mdi { background: var(--mdi); }
+    h2 {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .signals {
+      background: var(--bg-elev);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .sig-row, .sig-head {
+      display: grid;
+      grid-template-columns: 72px 1.15fr 1fr 64px 64px 64px;
+      gap: 8px;
+      padding: 10px 12px;
+      font-variant-numeric: tabular-nums;
+      align-items: center;
+    }
+    .sig-head {
+      color: var(--dim);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--line);
+    }
+    .sig-row {
+      font-size: 0.82rem;
+      border-top: 1px solid var(--line);
+    }
+    .sig-row:first-of-type { border-top: 0; }
+    .dir {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 750;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .dir.LONG { color: var(--long); background: var(--long-bg); }
+    .dir.SHORT { color: var(--short); background: var(--short-bg); }
+    .empty, .note, .err-text { color: var(--muted); font-size: 0.85rem; padding: 14px 12px; }
+    .note {
+      margin: 12px 2px 0;
+      padding: 0;
+      line-height: 1.45;
+      font-size: 0.78rem;
+      color: var(--dim);
+    }
+    .when { color: var(--text); }
+    .when small { display: block; color: var(--dim); font-size: 0.68rem; font-weight: 500; }
+    @media (max-width: 640px) {
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sig-head { display: none; }
+      .sig-row {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "when dir"
+          "meta meta";
+        gap: 4px 10px;
+        padding: 12px;
+      }
+      .when { grid-area: when; }
+      .dir { grid-area: dir; }
+      .meta {
+        grid-area: meta;
+        color: var(--muted);
+        font-size: 0.75rem;
+      }
+      .hide-sm { display: none; }
+    }
+    @media (min-width: 641px) {
+      .meta { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>ADX Swing Alert</h1>
+      <p class="sub">Binance USD-M Futures · 1-minute candles · ADX(14)</p>
+    </div>
+    <div id="status" class="status wait" role="status"><span class="dot"></span><span id="status-text">Loading</span></div>
+  </header>
+
+  <nav class="symbols" id="symbols" aria-label="Symbols"></nav>
+
+  <section class="stats" id="stats" aria-label="Latest values">
+    <div class="stat"><div class="lbl">Price</div><div class="val" id="st-price">—</div></div>
+    <div class="stat"><div class="lbl">ADX</div><div class="val" id="st-adx">—</div></div>
+    <div class="stat"><div class="lbl">+DI / −DI</div><div class="val" id="st-di">—</div></div>
+    <div class="stat"><div class="lbl">Last signal</div><div class="val" id="st-sig">—</div></div>
+  </section>
+
+  <div class="chart-wrap">
+    <div id="chart"></div>
+    <div class="chart-msg" id="chart-msg">Loading candles…</div>
+  </div>
+  <div class="legend">
+    <span><i class="swatch adx"></i>ADX</span>
+    <span><i class="swatch pdi"></i>+DI</span>
+    <span><i class="swatch mdi"></i>−DI</span>
+    <span><i class="swatch dash"></i>ADX 25</span>
+  </div>
+
+  <h2>Recent signals</h2>
+  <div class="signals" id="signals">
+    <div class="empty">Waiting for data…</div>
+  </div>
+  <p class="note">These are ADX alerts, not the zigzag swing signals.</p>
+
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.3.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="adx.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
