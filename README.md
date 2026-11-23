@@ -9,3 +9,5 @@ The five alert coins — NEAR, INJ, RENDER, FET, and ARB — sit at the front of
 A long fires when a swing low is newly confirmed; a short fires when a swing high is newly confirmed. Confirmation uses a 1.5% reversal from the running extreme and happens only on a closed candle, so pivots do not repaint.
 
 The paper engine, trade ledger, and wallet are a local simulation. This page never places real orders and never asks for an API key.
+
+A local Python (Streamlit) version of the same paper dashboard lives in [`python/`](python/), with run instructions in [`python/README.md`](python/README.md). GitHub Pages cannot run that app.
