@@ -6,6 +6,21 @@
   "use strict";
 
   var COINS = ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"];
+  var TOP_COINS = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "SUIUSDT",
+    "DOTUSDT", "LTCUSDT", "BCHUSDT", "UNIUSDT", "ATOMUSDT", "NEARUSDT", "FILUSDT", "APTUSDT", "ARBUSDT", "OPUSDT",
+    "INJUSDT", "TIAUSDT", "SEIUSDT", "WLDUSDT", "1000PEPEUSDT", "1000SHIBUSDT", "FETUSDT", "RENDERUSDT", "TAOUSDT", "AAVEUSDT",
+    "LDOUSDT", "ONDOUSDT", "ENAUSDT", "WIFUSDT", "1000BONKUSDT", "TRXUSDT", "HBARUSDT", "ICPUSDT", "ETCUSDT", "XLMUSDT",
+    "TONUSDT", "POLUSDT", "ORDIUSDT", "JUPUSDT", "PENDLEUSDT", "STXUSDT", "RUNEUSDT", "GRTUSDT", "ALGOUSDT", "CRVUSDT"
+  ];
+  var ALL_COINS = (function () {
+    var seen = {};
+    var out = [];
+    COINS.concat(TOP_COINS).forEach(function (s) {
+      if (!seen[s]) { seen[s] = true; out.push(s); }
+    });
+    return out;
+  })();
   var TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
   var TF = "15m";
   var TF_STORAGE_KEY = "adx-alert-tf";
@@ -170,8 +185,8 @@
     if (!raw) return "NEARUSDT";
     var s = String(raw).trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!s) return "NEARUSDT";
-    if (COINS.indexOf(s) !== -1) return s;
-    if (COINS.indexOf(s + "USDT") !== -1) return s + "USDT";
+    if (ALL_COINS.indexOf(s) !== -1) return s;
+    if (ALL_COINS.indexOf(s + "USDT") !== -1) return s + "USDT";
     return null;
   }
 
@@ -196,6 +211,8 @@
 
   return {
     COINS: COINS,
+    TOP_COINS: TOP_COINS,
+    ALL_COINS: ALL_COINS,
     TIMEFRAMES: TIMEFRAMES,
     TF: TF,
     TF_STORAGE_KEY: TF_STORAGE_KEY,
