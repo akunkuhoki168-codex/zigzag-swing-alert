@@ -6,6 +6,26 @@
   "use strict";
 
   var DEFAULT_REVERSAL = 1.5;
+  var COINS = ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"];
+  var TOP_COINS = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "SUIUSDT",
+    "DOTUSDT", "LTCUSDT", "BCHUSDT", "UNIUSDT", "ATOMUSDT", "NEARUSDT", "FILUSDT", "APTUSDT", "ARBUSDT", "OPUSDT",
+    "INJUSDT", "TIAUSDT", "SEIUSDT", "WLDUSDT", "1000PEPEUSDT", "1000SHIBUSDT", "FETUSDT", "RENDERUSDT", "TAOUSDT", "AAVEUSDT",
+    "LDOUSDT", "ONDOUSDT", "ENAUSDT", "WIFUSDT", "1000BONKUSDT", "TRXUSDT", "HBARUSDT", "ICPUSDT", "ETCUSDT", "XLMUSDT",
+    "TONUSDT", "POLUSDT", "ORDIUSDT", "JUPUSDT", "PENDLEUSDT", "STXUSDT", "RUNEUSDT", "GRTUSDT", "ALGOUSDT", "CRVUSDT"
+  ];
+  var ALL_COINS = (function () {
+    var seen = {};
+    var out = [];
+    COINS.concat(TOP_COINS).forEach(function (s) {
+      if (!seen[s]) { seen[s] = true; out.push(s); }
+    });
+    return out;
+  })();
+  var TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
+  var TF = "15m";
+  var TF_STORAGE_KEY = "zigzag-swing-alert-tf";
+  var TF_STORAGE_KEY_LEGACY = "adx-alert-tf";
 
   function clampReversal(pct) {
     var n = Number(pct);
@@ -13,13 +33,30 @@
     return Math.min(10, Math.max(0.2, n));
   }
 
-  function movePct(from, to) {
-    if (!from) return 0;
-    return (Math.abs(to - from) / from) * 100;
+  function closedKlines(klines, dropOpen) {
+    var k = klines || [];
+    if (dropOpen && k.length) {
+      var lastClose = Number(k[k.length - 1][6]);
+      if (lastClose >= Date.now()) k = k.slice(0, -1);
+    }
+    return k;
+  }
+
+  function rowsToCandles(rows) {
+    return (rows || []).map(function (row) {
+      return {
+        time: Math.floor(Number(row[0]) / 1000),
+        open: Number(row[1]),
+        high: Number(row[2]),
+        low: Number(row[3]),
+        close: Number(row[4]),
+        closeTime: Number(row[6]),
+      };
+    });
   }
 
   /**
-   * candles: [{time, open, high, low, close}] already closed only.
+   * candles: [{time, open, high, low, close, closeTime?}] already closed only.
    * reversalPct: percent move from the running extreme that confirms a pivot.
    */
   function compute(candles, reversalPct) {
@@ -55,12 +92,12 @@
           lastLowIdx = i;
         }
         if ((bar.high - extremeLow) / extremeLow * 100 >= dev) {
-          pivots.push(makePivot("LOW", lastLowIdx, extremeLow, candles[lastLowIdx]));
+          pivots.push(makePivot("LOW", lastLowIdx, extremeLow, candles[lastLowIdx], bar));
           dir = 1;
           extremeHigh = bar.high;
           lastHighIdx = i;
         } else if ((extremeHigh - bar.low) / extremeHigh * 100 >= dev) {
-          pivots.push(makePivot("HIGH", lastHighIdx, extremeHigh, candles[lastHighIdx]));
+          pivots.push(makePivot("HIGH", lastHighIdx, extremeHigh, candles[lastHighIdx], bar));
           dir = -1;
           extremeLow = bar.low;
           lastLowIdx = i;
@@ -73,7 +110,7 @@
           lastHighIdx = i;
         }
         if ((extremeHigh - bar.low) / extremeHigh * 100 >= dev) {
-          pivots.push(makePivot("HIGH", lastHighIdx, extremeHigh, candles[lastHighIdx]));
+          pivots.push(makePivot("HIGH", lastHighIdx, extremeHigh, candles[lastHighIdx], bar));
           dir = -1;
           extremeLow = bar.low;
           lastLowIdx = i;
@@ -84,7 +121,7 @@
           lastLowIdx = i;
         }
         if ((bar.high - extremeLow) / extremeLow * 100 >= dev) {
-          pivots.push(makePivot("LOW", lastLowIdx, extremeLow, candles[lastLowIdx]));
+          pivots.push(makePivot("LOW", lastLowIdx, extremeLow, candles[lastLowIdx], bar));
           dir = 1;
           extremeHigh = bar.high;
           lastHighIdx = i;
@@ -129,12 +166,15 @@
     };
   }
 
-  function makePivot(type, index, price, candle) {
+  function makePivot(type, index, price, candle, confirmCandle) {
     return {
       type: type,
       index: index,
       price: price,
       time: candle.time,
+      closeTime: candle.closeTime,
+      confirmTime: confirmCandle ? confirmCandle.time : candle.time,
+      confirmCloseTime: confirmCandle ? confirmCandle.closeTime : candle.closeTime,
       label: "",
     };
   }
@@ -165,9 +205,6 @@
     var high = lastOfType(pivots, "HIGH");
     var low = lastOfType(pivots, "LOW");
     if (high && low) {
-      var bullish = (high.label === "HH" || high.label === "HL") && (low.label === "HH" || low.label === "HL");
-      var bearish = (high.label === "LH" || high.label === "LL") && (low.label === "LH" || low.label === "LL");
-      /* Highs are HH/LH, lows are HL/LL. */
       if (high.label === "HH" && low.label === "HL") {
         return { label: "Uptrend (HH / HL)", kind: "up" };
       }
@@ -184,8 +221,8 @@
   /* A newly confirmed pivot is a signal. Long on confirmed LOW, short on confirmed HIGH. */
   function signalForPivot(pivot) {
     if (!pivot) return null;
-    if (pivot.type === "LOW") return { side: "LONG", pivot: pivot };
-    if (pivot.type === "HIGH") return { side: "SHORT", pivot: pivot };
+    if (pivot.type === "LOW") return { side: "LONG", signal: "long", pivot: pivot };
+    if (pivot.type === "HIGH") return { side: "SHORT", signal: "short", pivot: pivot };
     return null;
   }
 
@@ -197,10 +234,9 @@
   }
 
   function linePoints(zz) {
-    var pts = zz.pivots.map(function (p) {
+    return zz.pivots.map(function (p) {
       return { time: p.time, value: p.price };
     });
-    return pts;
   }
 
   function activePoints(zz) {
@@ -213,14 +249,74 @@
     ];
   }
 
+  function pivotKey(symbol, tf, pivot) {
+    return symbol + "|" + tf + "|" + pivot.type + "|" + pivot.time;
+  }
+
+  function formatWib(closeTimeMs) {
+    var d = new Date(closeTimeMs + 1 + 7 * 3600 * 1000);
+    var y = d.getUTCFullYear();
+    var mo = String(d.getUTCMonth() + 1).padStart(2, "0");
+    var da = String(d.getUTCDate()).padStart(2, "0");
+    var hh = String(d.getUTCHours()).padStart(2, "0");
+    var mm = String(d.getUTCMinutes()).padStart(2, "0");
+    return { date: y + "-" + mo + "-" + da, time: hh + ":" + mm, label: hh + ":" + mm, full: y + "-" + mo + "-" + da + " " + hh + ":" + mm };
+  }
+
+  function normalizeSymbol(raw) {
+    if (!raw) return "NEARUSDT";
+    var s = String(raw).trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!s) return "NEARUSDT";
+    if (ALL_COINS.indexOf(s) !== -1) return s;
+    if (ALL_COINS.indexOf(s + "USDT") !== -1) return s + "USDT";
+    return null;
+  }
+
+  function normalizeTimeframe(raw) {
+    if (!raw) return null;
+    var s = String(raw).trim().toLowerCase();
+    if (s === "15" || s === "15min") s = "15m";
+    if (s === "5" || s === "5min") s = "5m";
+    if (s === "1" || s === "1min") s = "1m";
+    if (s === "60" || s === "60m") s = "1h";
+    if (s === "240" || s === "240m") s = "4h";
+    return TIMEFRAMES.indexOf(s) !== -1 ? s : null;
+  }
+
+  function shortName(symbol) {
+    return String(symbol).replace(/USDT$/, "").replace(/^1000/, "1000");
+  }
+
+  function readSavedTf() {
+    try {
+      return normalizeTimeframe(localStorage.getItem(TF_STORAGE_KEY)) ||
+        normalizeTimeframe(localStorage.getItem(TF_STORAGE_KEY_LEGACY));
+    } catch (e) {
+      return null;
+    }
+  }
+
   return {
     DEFAULT_REVERSAL: DEFAULT_REVERSAL,
+    COINS: COINS,
+    TOP_COINS: TOP_COINS,
+    ALL_COINS: ALL_COINS,
+    TIMEFRAMES: TIMEFRAMES,
+    TF: TF,
+    TF_STORAGE_KEY: TF_STORAGE_KEY,
     clampReversal: clampReversal,
-    movePct: movePct,
+    closedKlines: closedKlines,
+    rowsToCandles: rowsToCandles,
     compute: compute,
     signalForPivot: signalForPivot,
     structureAllows: structureAllows,
     linePoints: linePoints,
     activePoints: activePoints,
+    pivotKey: pivotKey,
+    formatWib: formatWib,
+    normalizeSymbol: normalizeSymbol,
+    normalizeTimeframe: normalizeTimeframe,
+    shortName: shortName,
+    readSavedTf: readSavedTf,
   };
 });

@@ -5,7 +5,8 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var STORAGE_KEY = "adx-alert-paper-v1";
+  var STORAGE_KEY = "zigzag-swing-alert-paper-v1";
+  var LEGACY_STORAGE_KEY = "adx-alert-paper-v1";
   var STARTING_BALANCE = 10000;
   var TAKER_FEE = 0.0004;
   var MAX_TRADES = 200;
@@ -16,7 +17,6 @@
     margin: 100,
     shorts: true,
     structureFilter: false,
-    adxFilter: false,
     reversalPct: 1.5,
   };
 
@@ -53,7 +53,6 @@
       margin: margin,
       shorts: raw.shorts !== false,
       structureFilter: !!raw.structureFilter,
-      adxFilter: !!raw.adxFilter,
       reversalPct: reversalPct,
     };
   }
@@ -71,7 +70,7 @@
 
   function load() {
     try {
-      var raw = localStorage.getItem(STORAGE_KEY);
+      var raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
       if (!raw) return emptyState();
       var parsed = JSON.parse(raw);
       var s = emptyState();

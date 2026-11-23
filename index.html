@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#0b0e11">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="ADX Swing Alert: Wilder ADX/DMI(14) plus non-repainting ZigZag on Binance USD-M Futures. Paper trading only.">
-  <title>ADX Swing Alert</title>
+  <meta name="description" content="ZigZag Swing Alert: non-repainting bar-close ZigZag on Binance USD-M Futures. Paper trading only.">
+  <title>ZigZag Swing Alert</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect rx='12' width='64' height='64' fill='%230b0e11'/%3E%3Cpath d='M12 40 L26 24 L38 34 L52 16' stroke='%23fcd535' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <style>
     :root {
@@ -22,7 +22,6 @@
       --text: #eaecef;
       --muted: #848e9c;
       --dim: #5e6673;
-      --adx: #fcd535;
       --long-bg: rgba(14, 203, 129, 0.12);
       --short-bg: rgba(246, 70, 93, 0.12);
       --radius: 14px;
@@ -179,9 +178,6 @@
     .legend span { display: inline-flex; align-items: center; gap: 6px; }
     .swatch { width: 10px; height: 2px; border-radius: 1px; background: currentColor; }
     .swatch.dash { background: repeating-linear-gradient(90deg, #848e9c 0 4px, transparent 4px 7px); width: 14px; }
-    .swatch.adx { background: var(--adx); }
-    .swatch.pdi { background: var(--buy); }
-    .swatch.mdi { background: var(--sell); }
     .swatch.zz { background: var(--gold); }
     h2 {
       margin: 0 0 8px; font-size: 0.8rem; font-weight: 700;
@@ -201,7 +197,7 @@
       color: var(--dim); font-size: 0.65rem; font-weight: 700;
       letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--border);
     }
-    .sig-head { grid-template-columns: 72px 1.15fr 1fr 64px 64px 64px; }
+    .sig-head, .sig-row { grid-template-columns: 72px 1.15fr 80px 1fr; }
     .tr-head { grid-template-columns: 72px 70px 1fr 1fr 80px; }
     .sig-row, .tr-row { font-size: 0.82rem; border-top: 1px solid var(--border); }
     .sig-row:first-of-type, .tr-row:first-of-type { border-top: 0; }
@@ -246,10 +242,10 @@
         <div class="logo">⚡</div>
         <div>
           <div class="title-row">
-            <h1>ADX Swing Alert</h1>
+            <h1>ZigZag Swing Alert</h1>
             <span class="badge">PAPER MODE</span>
           </div>
-          <p class="sub">Non-repainting bar-close ZigZag · ADX/DMI(14) Wilder · Binance USD-M · no real orders</p>
+          <p class="sub">Non-repainting bar-close ZigZag · Binance USD-M · paper only, no real orders</p>
         </div>
       </div>
       <div class="header-tools">
@@ -280,11 +276,11 @@
       </div>
     </div>
 
-    <section class="stats" aria-label="Latest ADX values">
+    <section class="stats" aria-label="Latest ZigZag values">
       <div class="stat"><div class="lbl">Price</div><div class="val" id="st-price">—</div></div>
-      <div class="stat"><div class="lbl">ADX</div><div class="val" id="st-adx">—</div></div>
-      <div class="stat"><div class="lbl">+DI / −DI</div><div class="val" id="st-di">—</div></div>
-      <div class="stat"><div class="lbl">Last ADX signal</div><div class="val" id="st-sig">—</div></div>
+      <div class="stat"><div class="lbl">Last signal</div><div class="val" id="st-sig">—</div></div>
+      <div class="stat"><div class="lbl">Last pivot</div><div class="val" id="st-pivot">—</div></div>
+      <div class="stat"><div class="lbl">Structure</div><div class="val" id="st-label">—</div></div>
     </section>
 
     <section class="kpis" aria-label="ZigZag state">
@@ -322,10 +318,6 @@
         <input id="structureFilter" type="checkbox">
         <label class="chk" for="structureFilter">Structure filter (HL / LH only)</label>
       </div>
-      <div class="chk-row">
-        <input id="adxFilter" type="checkbox">
-        <label class="chk" for="adxFilter">ZigZag only if ADX ≥ 25 and DI agrees</label>
-      </div>
       <div class="ctl-actions">
         <button type="button" id="flattenBtn">Flatten paper</button>
         <button type="button" id="resetBtn" class="danger">Reset wallet</button>
@@ -337,16 +329,13 @@
       <div class="chart-msg" id="chart-msg">Loading candles…</div>
     </div>
     <div class="legend">
-      <span><i class="swatch zz"></i>ZigZag</span>
-      <span><i class="swatch dash"></i>Active leg / ADX 25</span>
-      <span><i class="swatch adx"></i>ADX</span>
-      <span><i class="swatch pdi"></i>+DI</span>
-      <span><i class="swatch mdi"></i>−DI</span>
+      <span><i class="swatch zz"></i>Confirmed ZigZag</span>
+      <span><i class="swatch dash"></i>Active (unconfirmed) leg</span>
     </div>
 
     <div class="panels">
       <div>
-        <h2>Recent ADX signals</h2>
+        <h2>Recent ZigZag signals</h2>
         <div class="card" id="signals"><div class="empty">Waiting for data…</div></div>
       </div>
       <div>
@@ -358,11 +347,10 @@
         <div class="card"><div id="console"></div></div>
       </div>
     </div>
-    <p class="note">ADX alerts fire on a closed candle when ADX is at least 25 and rising, plus a fresh DI cross or ADX crossing up through 25. ZigZag pivots also confirm only on bar close, so they do not repaint. The wallet is a local simulation. This page never sends orders and never asks for an API key. Times are shown in Asia/Jakarta (WIB, UTC+7).</p>
+    <p class="note">ZigZag pivots confirm only on bar close, so they do not repaint. A long is a newly confirmed swing low; a short is a newly confirmed swing high. The default reversal is 1.5%, matching the 15m alert scanner. The wallet is a local simulation. This page never sends orders and never asks for an API key. Times are shown in Asia/Jakarta (WIB, UTC+7).</p>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.3.0/dist/lightweight-charts.standalone.production.js"></script>
-  <script src="adx.js"></script>
   <script src="zigzag.js"></script>
   <script src="paper.js"></script>
   <script src="app.js"></script>
