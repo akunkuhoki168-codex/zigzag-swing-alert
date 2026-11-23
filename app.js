@@ -40,8 +40,7 @@
   var lastClosedOpen = null;
 
   var el = {
-    symbols: document.getElementById("symbols"),
-    moreCoins: document.getElementById("moreCoins"),
+    coinSelect: document.getElementById("coinSelect"),
     timeframes: document.getElementById("timeframes"),
     feedDot: document.getElementById("feedStatusDot"),
     wsBadge: document.getElementById("wsSourceBadge"),
@@ -557,21 +556,10 @@
   }
 
   function highlight() {
-    var buttons = el.symbols.querySelectorAll("button");
-    var i;
-    var inChips = false;
-    for (i = 0; i < buttons.length; i++) {
-      var on = buttons[i].dataset.symbol === symbol;
-      buttons[i].setAttribute("aria-pressed", on ? "true" : "false");
-      if (on) inChips = true;
-    }
-    if (el.moreCoins) {
-      el.moreCoins.value = inChips ? "" : symbol;
-      el.moreCoins.className = "more" + (inChips ? "" : " active");
-    }
+    if (el.coinSelect) el.coinSelect.value = symbol;
     if (el.timeframes) {
-      buttons = el.timeframes.querySelectorAll("button");
-      for (i = 0; i < buttons.length; i++) {
+      var buttons = el.timeframes.querySelectorAll("button");
+      for (var i = 0; i < buttons.length; i++) {
         buttons[i].setAttribute("aria-pressed", buttons[i].dataset.tf === tf ? "true" : "false");
       }
     }
@@ -608,28 +596,29 @@
     }
   }
 
+  function addOption(group, sym) {
+    var opt = document.createElement("option");
+    opt.value = sym;
+    opt.textContent = Z.shortName(sym);
+    group.appendChild(opt);
+  }
+
   function buildSwitcher() {
-    el.symbols.innerHTML = "";
-    Z.COINS.forEach(function (sym) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = Z.shortName(sym);
-      b.dataset.symbol = sym;
-      b.setAttribute("aria-pressed", sym === symbol ? "true" : "false");
-      b.addEventListener("click", function () {
-        if (sym !== symbol) load(sym, tf);
-      });
-      el.symbols.appendChild(b);
-    });
-    el.moreCoins.innerHTML = '<option value="">Top 50…</option>';
+    var select = el.coinSelect;
+    select.innerHTML = "";
+    var alerts = document.createElement("optgroup");
+    alerts.label = "Alert coins";
+    Z.COINS.forEach(function (sym) { addOption(alerts, sym); });
+    select.appendChild(alerts);
+    var more = document.createElement("optgroup");
+    more.label = "Top 50";
     Z.ALL_COINS.forEach(function (sym) {
-      var opt = document.createElement("option");
-      opt.value = sym;
-      opt.textContent = Z.shortName(sym);
-      el.moreCoins.appendChild(opt);
+      if (Z.COINS.indexOf(sym) === -1) addOption(more, sym);
     });
-    el.moreCoins.addEventListener("change", function () {
-      var sym = el.moreCoins.value;
+    select.appendChild(more);
+    select.value = symbol;
+    select.addEventListener("change", function () {
+      var sym = select.value;
       if (sym && sym !== symbol) load(sym, tf);
     });
     el.timeframes.innerHTML = "";

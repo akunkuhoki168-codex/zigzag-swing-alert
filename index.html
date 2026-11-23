@@ -113,7 +113,7 @@
       scrollbar-width: none; margin: 0; padding: 2px 0; flex: 1; min-width: 0;
     }
     .symbols::-webkit-scrollbar { display: none; }
-    .symbols button, select.more {
+    .symbols button {
       appearance: none; border: 1px solid var(--border); background: var(--panel);
       color: var(--muted); font: inherit; font-size: 0.85rem; font-weight: 650;
       padding: 8px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
@@ -121,8 +121,16 @@
     .symbols button[aria-pressed="true"] {
       background: var(--text); color: var(--bg); border-color: var(--text);
     }
-    select.more { padding-right: 28px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23848e9c'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
-    select.more.active { background-color: var(--text); color: var(--bg); border-color: var(--text); }
+    #coinSelect {
+      appearance: none; -webkit-appearance: none;
+      flex: 1; min-width: 0; max-width: 280px;
+      border: 1px solid var(--border); background: var(--panel);
+      color: var(--text); font: inherit; font-size: 0.85rem; font-weight: 650;
+      padding: 8px 32px 8px 12px; border-radius: 10px; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23848e9c'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    #coinSelect:focus { outline: none; border-color: var(--gold); }
     .stats, .kpis {
       display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 8px; margin-bottom: 10px;
@@ -265,10 +273,7 @@
     <div class="filters">
       <div class="filter-row">
         <span class="filter-label">Coin</span>
-        <nav class="symbols" id="symbols" aria-label="Alert symbols"></nav>
-        <select id="moreCoins" class="more" aria-label="Top 50 symbols">
-          <option value="">Top 50…</option>
-        </select>
+        <select id="coinSelect" aria-label="Coin"></select>
       </div>
       <div class="filter-row">
         <span class="filter-label">TF</span>
