@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+import json
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
+import requests
 import streamlit as st
 
 import data
@@ -15,6 +18,12 @@ import paper
 import zigzag as Z
 
 STATE_PATH = Path(__file__).resolve().parent / "state" / "paper.json"
+BOT_STATE_PATHS = [
+    Path(__file__).resolve().parent.parent / "data" / "paper_state.json",
+    Path("/workspace/adx-alert-dashboard/data/paper_state.json"),
+    Path("/workspace/zigzag-app/../adx-alert-dashboard/data/paper_state.json"),
+]
+BOT_STATE_URL = "https://raw.githubusercontent.com/dedkovic441-hub/zigzag-swing-alert/main/data/paper_state.json"
 WIB = timezone(timedelta(hours=7))
 REFRESH_SEC = 5
 
@@ -60,7 +69,163 @@ def persist() -> None:
     paper.save(STATE_PATH, st.session_state.paper)
 
 
-def build_chart(all_candles: list, zz: dict, pos: dict | None, dec: int) -> go.Figure:
+def load_bot_state() -> tuple[dict | None, str]:
+    for path in BOT_STATE_PATHS:
+        try:
+            if path.exists():
+                data_obj = json.loads(path.read_text())
+                if isinstance(data_obj, dict) and data_obj.get("schema") == "zigzag-paper-bot-1":
+                    return data_obj, str(path)
+        except (OSError, json.JSONDecodeError):
+            continue
+    try:
+        res = requests.get(
+            BOT_STATE_URL,
+            params={"t": int(time.time())},
+            timeout=12,
+            headers={"User-Agent": "ZigZagSwingAlert/1.0", "Cache-Control": "no-cache"},
+        )
+        res.raise_for_status()
+        data_obj = res.json()
+        if isinstance(data_obj, dict) and data_obj.get("schema") == "zigzag-paper-bot-1":
+            return data_obj, "GitHub raw"
+    except Exception as e:
+        return None, str(e)
+    return None, "unavailable"
+
+
+def bot_upnl(pos: dict, price: float | None, config: dict) -> float:
+    if not pos or price is None or price <= 0:
+        return 0.0
+    fee = float(config.get("fee_pct") or 0.04) / 100.0
+    qty = float(pos["qty"])
+    entry = float(pos["entry"])
+    entry_fee = float(pos.get("entry_fee") or float(pos.get("notional") or 0) * fee)
+    exit_fee = price * qty * fee
+    if pos["side"] == "long":
+        return (price - entry) * qty - entry_fee - exit_fee
+    return (entry - price) * qty - entry_fee - exit_fee
+
+
+def add_bot_markers(fig: go.Figure, bot: dict | None, symbol: str) -> None:
+    if not bot:
+        return
+    xs_in, ys_in, txt_in, col_in = [], [], [], []
+    xs_out, ys_out, txt_out = [], [], []
+    for tr in bot.get("trades") or []:
+        if tr.get("symbol") != symbol:
+            continue
+        if tr.get("entry_time"):
+            xs_in.append(wib(ts_s=tr["entry_time"]))
+            ys_in.append(tr["entry"])
+            txt_in.append(f"BOT {tr['side'].upper()} {tr.get('entry_reason') or ''}")
+            col_in.append("#0ecb81" if tr["side"] == "long" else "#f6465d")
+        if tr.get("exit_time"):
+            xs_out.append(wib(ts_s=tr["exit_time"]))
+            ys_out.append(tr["exit"])
+            txt_out.append(f"EXIT {tr.get('exit_reason') or ''}")
+    pos = (bot.get("positions") or {}).get(symbol)
+    if pos and pos.get("entry_time"):
+        xs_in.append(wib(ts_s=pos["entry_time"]))
+        ys_in.append(pos["entry"])
+        txt_in.append(f"BOT {pos['side'].upper()} {pos.get('entry_reason') or ''}")
+        col_in.append("#0ecb81" if pos["side"] == "long" else "#f6465d")
+        if pos.get("tp") is not None:
+            fig.add_hline(
+                y=pos["tp"],
+                line_dash="dot",
+                line_color="#fcd535",
+                annotation_text="BOT TP",
+                annotation_position="top left",
+            )
+    if xs_in:
+        fig.add_trace(go.Scatter(
+            x=xs_in, y=ys_in, mode="markers+text",
+            marker=dict(size=12, color=col_in, symbol="triangle-up"),
+            text=txt_in, textposition="bottom center",
+            textfont=dict(size=10, color="#eaecef"),
+            name="Bot entry",
+            hovertemplate="%{text} %{y}<extra></extra>",
+        ))
+    if xs_out:
+        fig.add_trace(go.Scatter(
+            x=xs_out, y=ys_out, mode="markers+text",
+            marker=dict(size=11, color="#fcd535", symbol="square"),
+            text=txt_out, textposition="top center",
+            textfont=dict(size=10, color="#fcd535"),
+            name="Bot exit",
+            hovertemplate="%{text} %{y}<extra></extra>",
+        ))
+
+
+def render_bot_panel(bot: dict | None, source: str, symbol: str, last_px: float | None) -> None:
+    st.subheader("24/7 Paper Bot")
+    st.caption(
+        "Official simulated book. Long on confirmed LL, short on confirmed HH, no stop-loss. "
+        "Runs on GitHub Actions about every five minutes and does not need this app to stay open. "
+        "Paper only — no API keys, no real orders."
+    )
+    if not bot:
+        st.warning(f"Could not load bot state ({source}).")
+        return
+    cfg = bot.get("config") or {}
+    positions = bot.get("positions") or {}
+    open_rows = []
+    eq = float(bot.get("cash") or 0)
+    for sym, pos in positions.items():
+        if not pos:
+            continue
+        px = last_px if sym == symbol else (bot.get("last_prices") or {}).get(sym)
+        u = bot_upnl(pos, px, cfg)
+        eq += u
+        open_rows.append({
+            "Coin": Z.short_name(sym),
+            "Side": pos.get("side"),
+            "Entry reason": pos.get("entry_reason"),
+            "Entry": pos.get("entry"),
+            "Mark": px,
+            "TP": pos.get("tp"),
+            "uPnL": round(u, 2),
+            "Opened (WIB)": fmt_wib(ts_ms=pos.get("entry_close_time")),
+        })
+    stats = bot.get("stats") or {}
+    c1, c2, c3, c4 = st.columns(4)
+    start = float(cfg.get("starting_balance") or 10000)
+    c1.metric("Bot equity", f"{data.fmt_price(eq, 2)} USDT", delta=round(eq - start, 2))
+    c2.metric("Win rate", f"{stats.get('win_rate', 0):.1f}%" if stats.get("trades") else "—")
+    c3.metric("Open positions", str(len(open_rows)))
+    c4.metric("Last bot run", bot.get("last_run_at_wib") or "—")
+    note = " · ".join(filter(None, [
+        f"Feed {bot.get('data_source') or '—'}" + (f" ({bot.get('data_market')})" if bot.get("data_market") else ""),
+        "No stop-loss",
+        f"Source {source}",
+        bot.get("data_note") or "",
+    ]))
+    st.caption(note)
+    st.markdown("**Open positions**")
+    if open_rows:
+        st.dataframe(pd.DataFrame(open_rows), use_container_width=True, hide_index=True)
+    else:
+        st.info("No open bot positions. The book starts flat and only trades newly closed 15m candles.")
+    st.markdown("**Bot trade history**")
+    trades = list(reversed(bot.get("trades") or []))
+    if not trades:
+        st.info("No bot trades yet. The first run seeds a flat book from now.")
+    else:
+        rows = []
+        for tr in trades[:80]:
+            rows.append({
+                "Exit (WIB)": fmt_wib(ts_ms=tr.get("exit_close_time")),
+                "Coin": Z.short_name(tr.get("symbol") or ""),
+                "Side": tr.get("side"),
+                "Entry → Exit": f"{tr.get('entry')} → {tr.get('exit')}",
+                "Reason": f"{tr.get('entry_reason') or ''} → {tr.get('exit_reason') or ''}",
+                "PnL": tr.get("pnl"),
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height=280)
+
+
+def build_chart(all_candles: list, zz: dict, pos: dict | None, dec: int, bot: dict | None = None, symbol: str | None = None) -> go.Figure:
     times = [wib(ts_s=c["time"]) for c in all_candles]
     fig = go.Figure(
         data=[
@@ -122,6 +287,8 @@ def build_chart(all_candles: list, zz: dict, pos: dict | None, dec: int) -> go.F
     if pos:
         fig.add_hline(y=pos["sl"], line_dash="dash", line_color="#f6465d", annotation_text="SL", annotation_position="bottom right")
         fig.add_hline(y=pos["tp"], line_dash="dash", line_color="#0ecb81", annotation_text="TP", annotation_position="top right")
+    if bot and symbol:
+        add_bot_markers(fig, bot, symbol)
 
     fig.update_layout(
         template="plotly_dark",
@@ -266,14 +433,14 @@ def main() -> None:
         tf = st.selectbox("Timeframe", Z.TIMEFRAMES, index=Z.TIMEFRAMES.index(Z.DEFAULT_TF), key="tf")
 
     engine_col, _ = st.columns([1, 3])
-    engine_label = "Stop paper engine" if state.get("engine_on") else "Start paper engine"
+    engine_label = "Stop local sandbox" if state.get("engine_on") else "Start local sandbox"
     if engine_col.button(engine_label, type="primary" if not state.get("engine_on") else "secondary"):
         state["engine_on"] = not state.get("engine_on")
         if state["engine_on"]:
             st.session_state.last_closed_open = "pending"
             log(
-                f"Paper engine ON · {Z.short_name(symbol)} {tf} · reversal {params['reversal_pct']}% · "
-                f"{params['leverage']}x. Simulated only.",
+                f"Local sandbox ON · {Z.short_name(symbol)} {tf} · reversal {params['reversal_pct']}% · "
+                f"{params['leverage']}x. This app only, not the 24/7 bot.",
                 "warn",
             )
         else:
@@ -332,6 +499,7 @@ def main() -> None:
 
         maybe_trade(symbol, tf, closed, zz, last_px)
         state = st.session_state.paper
+        bot, bot_src = load_bot_state()
 
         last_pivot = zz["pivots"][-1] if zz["pivots"] else None
         last_sig = Z.signal_for_pivot(last_pivot)
@@ -344,14 +512,22 @@ def main() -> None:
         m4.metric("Structure", (last_pivot.get("label") or last_pivot["type"]) if last_pivot else "—")
         m5.metric("Trend state", zz["trend"])
         m6.metric("Reversal trigger", data.fmt_price(zz["trigger"], dec) if zz["trigger"] is not None else "—")
-        m7.metric("Paper equity", f"{data.fmt_price(eq, 2)} USDT")
+        m7.metric("Local sandbox equity", f"{data.fmt_price(eq, 2)} USDT")
 
         st.caption(
             f"Feed {src} · refresh every {REFRESH_SEC}s · default reversal {Z.DEFAULT_REVERSAL:g}% · "
             f"times in Asia/Jakarta (WIB, UTC+7)"
         )
+        render_bot_panel(bot, bot_src, symbol, last_px)
         st.plotly_chart(
-            build_chart(all_c, zz, state["position"] if same_symbol else None, dec),
+            build_chart(
+                all_c,
+                zz,
+                state["position"] if same_symbol else None,
+                dec,
+                bot=bot if tf == "15m" else None,
+                symbol=symbol,
+            ),
             use_container_width=True,
         )
 
@@ -373,7 +549,7 @@ def main() -> None:
                 st.dataframe(pd.DataFrame(rows_out), use_container_width=True, hide_index=True, height=320)
 
         with led_col:
-            st.subheader("Paper trade ledger")
+            st.subheader("Local sandbox ledger")
             pos = state.get("position")
             trades = state.get("trades") or []
             if not pos and not trades:
@@ -411,8 +587,8 @@ def main() -> None:
 
         st.caption(
             "ZigZag pivots confirm only on bar close, so they do not repaint. "
-            "A long is a newly confirmed swing low; a short is a newly confirmed swing high. "
-            "The wallet is a local simulation stored on this computer. "
+            "The 24/7 paper bot is the official simulated book and keeps running on GitHub Actions "
+            "when this app is closed. The local sandbox is a separate what-if wallet stored on this computer. "
             "This app never sends orders and never asks for an API key."
         )
 

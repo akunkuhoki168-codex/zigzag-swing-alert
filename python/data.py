@@ -7,30 +7,39 @@ from typing import Any
 
 import requests
 
-REST_BASES = [
-    "https://fapi.binance.com",
-    "https://fapi1.binance.com",
-    "https://fapi2.binance.com",
-    "https://fapi3.binance.com",
-    "https://fapi4.binance.com",
+# USD-M first. fapi.binance.com often returns 451 from US networks;
+# data-api.binance.vision and api.binance.com are spot fallbacks.
+ENDPOINTS = [
+    ("https://fapi.binance.com", "/fapi/v1/klines", "FAPI"),
+    ("https://fapi1.binance.com", "/fapi/v1/klines", "FAPI1"),
+    ("https://fapi2.binance.com", "/fapi/v1/klines", "FAPI2"),
+    ("https://fapi3.binance.com", "/fapi/v1/klines", "FAPI3"),
+    ("https://fapi4.binance.com", "/fapi/v1/klines", "FAPI4"),
+    ("https://www.binance.com", "/fapi/v1/klines", "WWW-FAPI"),
+    ("https://data-api.binance.vision", "/fapi/v1/klines", "VISION-FAPI"),
+    ("https://data-api.binance.vision", "/api/v3/klines", "VISION-SPOT"),
+    ("https://api.binance.com", "/api/v3/klines", "SPOT"),
 ]
+REST_BASES = [e[0] for e in ENDPOINTS if e[1].startswith("/fapi")]
 LIMIT = 500
 TIMEOUT = 12
 
 
 def fetch_klines(symbol: str, interval: str, limit: int = LIMIT) -> tuple[list, str]:
     err: Exception | None = None
-    for attempt in range(8):
-        base = REST_BASES[attempt % len(REST_BASES)]
-        label = ["FAPI","FAPI1","FAPI2","FAPI3","FAPI4"][attempt % len(REST_BASES)]
-        url = f"{base}/fapi/v1/klines"
+    for attempt in range(len(ENDPOINTS) + 3):
+        base, path, label = ENDPOINTS[attempt % len(ENDPOINTS)]
+        url = f"{base}{path}"
         try:
             res = requests.get(
                 url,
                 params={"symbol": symbol, "interval": interval, "limit": limit},
                 timeout=TIMEOUT,
                 headers={"User-Agent": "ZigZagSwingAlert/1.0"},
+                allow_redirects=True,
             )
+            if res.status_code == 451:
+                raise RuntimeError("HTTP 451 geo-blocked")
             res.raise_for_status()
             data = res.json()
             if not isinstance(data, list) or not data:
@@ -38,7 +47,7 @@ def fetch_klines(symbol: str, interval: str, limit: int = LIMIT) -> tuple[list, 
             return data, label
         except Exception as e:
             err = e
-            time.sleep(1.0)
+            time.sleep(0.4)
     raise err or RuntimeError("klines fetch failed")
 
 

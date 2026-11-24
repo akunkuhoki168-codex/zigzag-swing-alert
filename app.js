@@ -68,7 +68,23 @@
     structureFilter: document.getElementById("structureFilter"),
     flattenBtn: document.getElementById("flattenBtn"),
     resetBtn: document.getElementById("resetBtn"),
+    botStatus: document.getElementById("botStatus"),
+    botEquity: document.getElementById("bot-equity"),
+    botWinrate: document.getElementById("bot-winrate"),
+    botOpen: document.getElementById("bot-open"),
+    botLastrun: document.getElementById("bot-lastrun"),
+    botMeta: document.getElementById("botMeta"),
+    botPositions: document.getElementById("botPositions"),
+    botTrades: document.getElementById("botTrades"),
   };
+
+  var BOT_STATE_URLS = [
+    "https://raw.githubusercontent.com/dedkovic441-hub/zigzag-swing-alert/main/data/paper_state.json",
+    "data/paper_state.json"
+  ];
+  var botState = null;
+  var botTpLine = null;
+
 
   function logEngine(msg, kind) {
     var row = document.createElement("div");
@@ -185,7 +201,7 @@
   function setEngineButton() {
     el.toggleBtn.className = paper.engineOn ? "engine on" : "engine";
     el.toggleBtn.setAttribute("aria-pressed", paper.engineOn ? "true" : "false");
-    el.toggleBtn.textContent = paper.engineOn ? "Stop paper engine" : "Start paper engine";
+    el.toggleBtn.textContent = paper.engineOn ? "Stop local sandbox" : "Start local sandbox";
   }
 
   function buildChart() {
@@ -270,6 +286,204 @@
     });
   }
 
+
+  function botStateUrls() {
+    var t = Date.now();
+    return BOT_STATE_URLS.map(function (u) {
+      return u + (u.indexOf("?") >= 0 ? "&" : "?") + "t=" + t;
+    });
+  }
+
+  function botUpnl(pos, px) {
+    if (!pos || px == null || !px) return 0;
+    var cfg = (botState && botState.config) || {};
+    var fee = (Number(cfg.fee_pct) || 0.04) / 100;
+    var qty = Number(pos.qty);
+    var entry = Number(pos.entry);
+    var entryFee = Number(pos.entry_fee) || (Number(pos.notional) || 0) * fee;
+    var exitFee = px * qty * fee;
+    if (pos.side === "long") return (px - entry) * qty - entryFee - exitFee;
+    return (entry - px) * qty - entryFee - exitFee;
+  }
+
+  function botMarkFor(sym) {
+    if (sym === symbol && markPrice != null) return markPrice;
+    if (botState && botState.last_prices && botState.last_prices[sym] != null) {
+      return botState.last_prices[sym];
+    }
+    return null;
+  }
+
+  function renderBot() {
+    if (!el.botEquity) return;
+    if (!botState) {
+      el.botStatus.textContent = "Bot state unavailable";
+      el.botStatus.className = "bot-live err";
+      return;
+    }
+    var stats = botState.stats || {};
+    var cfg = botState.config || {};
+    var cash = Number(botState.cash || 0);
+    var eq = cash;
+    var positions = botState.positions || {};
+    var openList = [];
+    Object.keys(positions).forEach(function (sym) {
+      var pos = positions[sym];
+      if (!pos) return;
+      var px = botMarkFor(sym);
+      var u = botUpnl(pos, px);
+      eq += u;
+      openList.push({ pos: pos, px: px, u: u });
+    });
+    var start = Number(cfg.starting_balance) || 10000;
+    el.botEquity.textContent = fmtPrice(eq, 2) + " USDT";
+    el.botEquity.className = "val " + (eq >= start ? "up" : "down");
+    var wr = stats.win_rate;
+    el.botWinrate.textContent = (stats.trades ? wr.toFixed(1) + "%  (" + (stats.wins || 0) + "/" + stats.trades + ")" : "—");
+    el.botOpen.textContent = String(openList.length);
+    el.botLastrun.textContent = botState.last_run_at_wib || "—";
+    var status = botState.last_run_at_wib
+      ? "Last run " + botState.last_run_at_wib
+      : "Seeded, waiting for the next closed 15m candle";
+    el.botStatus.textContent = status;
+    el.botStatus.className = "bot-live ok";
+    var market = botState.data_market || "";
+    var src = botState.data_source || "";
+    var note = botState.data_note || "";
+    el.botMeta.textContent = [
+      src ? ("Feed " + src + (market ? " · " + market : "")) : "",
+      "No stop-loss",
+      "Starting " + fmtPrice(start, 0) + " USDT",
+      "Notional " + fmtPrice(cfg.notional || 1000, 0) + " USDT",
+      "Fee " + (cfg.fee_pct != null ? cfg.fee_pct : 0.04) + "%/side",
+      "Reversal " + (cfg.reversal_pct != null ? cfg.reversal_pct : 1.5) + "%",
+      "TP " + (cfg.take_profit_pct != null ? cfg.take_profit_pct : 3) + "%",
+      note
+    ].filter(Boolean).join(" · ");
+
+    if (!openList.length) {
+      el.botPositions.innerHTML = '<div class="empty">No open bot positions. The book starts flat and only trades newly closed 15m candles.</div>';
+    } else {
+      var html = '<div class="bot-headrow"><div>Coin</div><div>Side</div><div>Reason</div><div>Entry</div><div>Mark</div><div>TP</div><div>uPnL</div></div>';
+      html += openList.map(function (row) {
+        var pos = row.pos;
+        var dec = 4;
+        var w = Z.formatWib(pos.entry_close_time);
+        var ucls = row.u >= 0 ? "pos" : "neg";
+        return '<div class="bot-row">' +
+          '<div class="when">' + Z.shortName(pos.symbol) + "<small>" + w.date + " " + w.time + " WIB</small></div>" +
+          '<div><span class="pill ' + String(pos.side).toUpperCase() + '">' + pos.side + "</span></div>" +
+          '<div class="hide-sm">' + (pos.entry_reason || "") + "</div>" +
+          '<div class="hide-sm">' + fmtPrice(pos.entry, dec) + "</div>" +
+          '<div class="hide-sm">' + fmtPrice(row.px, dec) + "</div>" +
+          '<div class="hide-sm">' + fmtPrice(pos.tp, dec) + "</div>" +
+          '<div class="pnl ' + ucls + '">' + (row.u >= 0 ? "+" : "") + fmtPrice(row.u, 2) + "</div>" +
+          '<div class="meta">' + (pos.entry_reason || "") + " · " + fmtPrice(pos.entry, dec) + " → " + fmtPrice(row.px, dec) + "</div>" +
+        "</div>";
+      }).join("");
+      el.botPositions.innerHTML = html;
+    }
+
+    var trades = (botState.trades || []).slice().reverse();
+    if (!trades.length) {
+      el.botTrades.innerHTML = '<div class="empty">No bot trades yet. The first run seeds a flat book from now, so history starts with the next qualifying 15m close.</div>';
+    } else {
+      var html = '<div class="bot-headrow"><div>Exit (WIB)</div><div>Coin</div><div>Side</div><div>Entry → Exit</div><div>Reason</div><div></div><div>PnL</div></div>';
+      html += trades.slice(0, 80).map(function (tr) {
+        var w = Z.formatWib(tr.exit_close_time);
+        var dec = 4;
+        var reason = (tr.entry_reason || "") + " → " + (tr.exit_reason || "");
+        return '<div class="bot-row">' +
+          '<div class="when">' + w.time + "<small>" + w.date + "</small></div>" +
+          '<div class="hide-sm">' + Z.shortName(tr.symbol) + "</div>" +
+          '<div><span class="pill ' + String(tr.side).toUpperCase() + '">' + tr.side + "</span></div>" +
+          '<div class="hide-sm">' + fmtPrice(tr.entry, dec) + " → " + fmtPrice(tr.exit, dec) + "</div>" +
+          '<div class="hide-sm">' + reason + "</div>" +
+          '<div></div>' +
+          '<div class="pnl ' + (tr.pnl >= 0 ? "pos" : "neg") + '">' + (tr.pnl >= 0 ? "+" : "") + fmtPrice(tr.pnl, 2) + "</div>" +
+          '<div class="meta">' + Z.shortName(tr.symbol) + " · " + reason + "</div>" +
+        "</div>";
+      }).join("");
+      el.botTrades.innerHTML = html;
+    }
+    updateBotTpLine();
+  }
+
+  function botMarkers() {
+    var marks = [];
+    if (!botState) return marks;
+    var trades = botState.trades || [];
+    trades.forEach(function (tr) {
+      if (tr.symbol !== symbol) return;
+      if (tr.entry_time) {
+        marks.push({
+          time: tr.entry_time,
+          position: tr.side === "long" ? "belowBar" : "aboveBar",
+          color: tr.side === "long" ? "#0ecb81" : "#f6465d",
+          shape: tr.side === "long" ? "arrowUp" : "arrowDown",
+          text: "BOT " + String(tr.side).toUpperCase() + " " + (tr.entry_reason || ""),
+          size: 1,
+        });
+      }
+      if (tr.exit_time) {
+        marks.push({
+          time: tr.exit_time,
+          position: tr.side === "long" ? "aboveBar" : "belowBar",
+          color: "#fcd535",
+          shape: "square",
+          text: "EXIT " + (tr.exit_reason || ""),
+          size: 1,
+        });
+      }
+    });
+    var pos = botState.positions && botState.positions[symbol];
+    if (pos && pos.entry_time) {
+      marks.push({
+        time: pos.entry_time,
+        position: pos.side === "long" ? "belowBar" : "aboveBar",
+        color: pos.side === "long" ? "#0ecb81" : "#f6465d",
+        shape: pos.side === "long" ? "arrowUp" : "arrowDown",
+        text: "BOT " + String(pos.side).toUpperCase() + " " + (pos.entry_reason || ""),
+        size: 1,
+      });
+    }
+    return marks;
+  }
+
+  function updateBotTpLine() {
+    if (botTpLine) { try { botTpLine.remove(); } catch (e) {} botTpLine = null; }
+    if (!candleSeries || !botState) return;
+    var pos = botState.positions && botState.positions[symbol];
+    if (!pos || pos.tp == null) return;
+    botTpLine = candleSeries.createPriceLine({
+      price: pos.tp, color: "#fcd535", lineWidth: 1,
+      lineStyle: LC.LineStyle.Dotted, axisLabelVisible: true, title: "BOT TP",
+    });
+  }
+
+  async function fetchBotState() {
+    var urls = botStateUrls();
+    var i, err;
+    for (i = 0; i < urls.length; i++) {
+      try {
+        var res = await fetch(urls[i], { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        var data = await res.json();
+        if (!data || data.schema !== "zigzag-paper-bot-1") throw new Error("unexpected schema");
+        botState = data;
+        renderBot();
+        return data;
+      } catch (e) {
+        err = e;
+      }
+    }
+    if (el.botStatus) {
+      el.botStatus.textContent = "Could not load bot state";
+      el.botStatus.className = "bot-live err";
+    }
+    return null;
+  }
+
   function render(data, keepRange) {
     var closedRows = Z.closedKlines(data, true);
     var dec = priceDecimals(data);
@@ -296,7 +510,9 @@
         size: 0.8,
       };
     });
-    zzMarkersApi.setMarkers(zzMarks);
+    zzMarkersApi.setMarkers(zzMarks.concat(botMarkers()));
+    updateBotTpLine();
+    if (botState) renderBot();
 
     if (range) chart.timeScale().setVisibleLogicalRange(range);
     else {
@@ -632,7 +848,7 @@
     if (paper.engineOn) {
       var closed = Z.closedKlines(klines, true);
       lastClosedOpen = closed.length ? Number(closed[closed.length - 1][0]) : null;
-      logEngine("Paper engine ON · " + Z.shortName(symbol) + " " + tf + " · reversal " + paper.params.reversalPct + "% · " + paper.params.leverage + "x. Simulated only.", "WARN");
+      logEngine("Local sandbox ON · " + Z.shortName(symbol) + " " + tf + " · reversal " + paper.params.reversalPct + "% · " + paper.params.leverage + "x. This tab only, not the 24/7 bot.", "WARN");
     } else {
       logEngine("Paper engine OFF. Open simulated positions stay until you flatten or they hit SL/TP.", "WARN");
     }
@@ -688,6 +904,14 @@
   setEngineButton();
   buildSwitcher();
   buildChart();
-  logEngine("ZigZag Swing Alert ready. Paper trading only — no API keys, no live orders.", "OK");
+  logEngine("ZigZag Swing Alert ready. The 24/7 paper bot runs on GitHub Actions even when this tab is closed. Local sandbox is this browser only. No API keys, no live orders.", "OK");
+  fetchBotState().then(function () {
+    if (klines.length) render(klines, true);
+  });
+  setInterval(function () {
+    fetchBotState().then(function () {
+      if (klines.length && zzMarkersApi) render(klines, true);
+    });
+  }, 60000);
   load(symbol, tf, true);
 })();

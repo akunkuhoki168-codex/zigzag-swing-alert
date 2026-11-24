@@ -231,6 +231,48 @@
     #console .WARN { color: var(--gold); }
     #console .ERR { color: var(--sell); }
     #console .OK { color: var(--buy); }
+
+    .bot {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 14px 8px; margin-bottom: 12px;
+    }
+    .bot-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+    .bot-head h2 { margin: 0; color: var(--text); text-transform: none; letter-spacing: -0.02em; font-size: 1rem; }
+    .bot-live {
+      margin-left: auto; font-size: 0.72rem; color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .bot-live.ok { color: var(--buy); }
+    .bot-live.err { color: var(--sell); }
+    .bot-rules { margin: 0 0 12px; color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
+    .bot .kpis { margin-bottom: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .bot-meta { margin: 0 0 12px; color: var(--dim); font-size: 0.72rem; }
+    .bot h3 {
+      margin: 12px 0 6px; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+    }
+    .bot .card { margin-bottom: 8px; }
+    .bot-row, .bot-headrow {
+      display: grid; gap: 8px; padding: 10px 12px;
+      font-variant-numeric: tabular-nums; align-items: center;
+      grid-template-columns: 88px 70px 70px 1fr 1fr 70px 80px;
+    }
+    .bot-headrow {
+      color: var(--dim); font-size: 0.65rem; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--border);
+    }
+    .bot-row { font-size: 0.82rem; border-top: 1px solid var(--border); }
+    .bot-row:first-of-type { border-top: 0; }
+    .sandbox-label { margin: 14px 0 8px; }
+    .sandbox-label h2 { display: inline; }
+    .sandbox-hint { color: var(--dim); font-size: 0.72rem; margin: 0 0 8px; }
+    @media (max-width: 700px) {
+      .bot-headrow { display: none; }
+      .bot-row {
+        grid-template-columns: 1fr auto;
+        gap: 4px 10px; padding: 12px;
+      }
+    }
     @media (max-width: 700px) {
       .stats, .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .sig-head, .tr-head { display: none; }
@@ -294,6 +336,39 @@
       <div class="stat"><div class="lbl">Paper equity</div><div class="val" id="st-equity">—</div></div>
     </section>
 
+
+    <section class="bot" id="bot" aria-label="24/7 paper bot">
+      <div class="bot-head">
+        <h2>24/7 Paper Bot</h2>
+        <span class="badge">PAPER ONLY</span>
+        <span class="bot-live" id="botStatus">Loading state…</span>
+      </div>
+      <p class="bot-rules">
+        Long on a confirmed LL, then exit at +3% take-profit (checked against the candle high; fill at the TP price)
+        or a newly confirmed swing high, whichever comes first. If the long is in profit or flat at that confirming close,
+        either HH or LH exits; if it is in a loss, only an HH exits and an LH is ignored.
+        Short is the opposite: enter on a confirmed HH, take-profit at −3% on the candle low, and exit on a confirmed
+        swing low (LL or HL) when in profit or flat. If the short is in a loss, only an LL exits and an HL is ignored.
+        There is no stop-loss. One position per coin on NEAR, INJ, RENDER, FET and ARB, 15m Binance USD-M candles,
+        1.5% ZigZag reversal, 1,000 USDT notional, 0.04% fee per side, starting balance 10,000 USDT.
+        This bot runs on a GitHub Actions schedule about every five minutes and does not need this browser tab to stay open.
+        It never places real orders and never asks for an API key.
+      </p>
+      <section class="kpis" aria-label="Bot account">
+        <div class="stat"><div class="lbl">Bot equity</div><div class="val" id="bot-equity">—</div></div>
+        <div class="stat"><div class="lbl">Win rate</div><div class="val" id="bot-winrate">—</div></div>
+        <div class="stat"><div class="lbl">Open positions</div><div class="val" id="bot-open">—</div></div>
+        <div class="stat"><div class="lbl">Last bot run</div><div class="val" id="bot-lastrun">—</div></div>
+      </section>
+      <p class="bot-meta" id="botMeta"></p>
+      <h3>Open positions</h3>
+      <div class="card" id="botPositions"><div class="empty">Loading…</div></div>
+      <h3>Bot trade history</h3>
+      <div class="card" id="botTrades"><div class="empty">Loading…</div></div>
+    </section>
+
+    <div class="sandbox-label"><h2>Local browser sandbox</h2></div>
+    <p class="sandbox-hint">Runs only in this tab and stops when the browser is closed. Separate from the 24/7 bot above. Simulated only.</p>
     <form class="controls" id="controls" autocomplete="off">
       <div class="ctl">
         <label for="reversalPct">ZigZag reversal <span class="range-val" id="reversalLabel">1.5%</span></label>
@@ -336,6 +411,7 @@
     <div class="legend">
       <span><i class="swatch zz"></i>Confirmed ZigZag</span>
       <span><i class="swatch dash"></i>Active (unconfirmed) leg</span>
+      <span>▲▼ Bot entries and exits</span>
     </div>
 
     <div class="panels">
@@ -344,7 +420,7 @@
         <div class="card" id="signals"><div class="empty">Waiting for data…</div></div>
       </div>
       <div>
-        <h2>Paper trade ledger</h2>
+        <h2>Local sandbox ledger</h2>
         <div class="card" id="ledger"><div class="empty">No paper trades yet.</div></div>
       </div>
       <div class="console-wrap">
@@ -352,7 +428,7 @@
         <div class="card"><div id="console"></div></div>
       </div>
     </div>
-    <p class="note">ZigZag pivots confirm only on bar close, so they do not repaint. A long is a newly confirmed swing low; a short is a newly confirmed swing high. The default reversal is 1.5%, matching the 15m alert scanner. The wallet is a local simulation. This page never sends orders and never asks for an API key. Times are shown in Asia/Jakarta (WIB, UTC+7).</p>
+    <p class="note">ZigZag pivots confirm only on bar close, so they do not repaint. The 24/7 paper bot is the official simulated book: it enters a long on a confirmed LL and a short on a confirmed HH, exits on take-profit or the structure rules above, and has no stop-loss. It keeps running on GitHub Actions when this tab is closed. The local sandbox on this page is a separate what-if wallet stored in the browser; it is not the 24/7 bot and it does not run in the background. This page never sends orders and never asks for an API key. Times are shown in Asia/Jakarta (WIB, UTC+7).</p>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.3.0/dist/lightweight-charts.standalone.production.js"></script>

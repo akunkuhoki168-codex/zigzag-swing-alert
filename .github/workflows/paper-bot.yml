@@ -1,0 +1,45 @@
+name: Paper bot
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zigzag-paper-bot
+  cancel-in-progress: false
+
+jobs:
+  paper:
+    name: Run paper bot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet requests
+
+      - name: Run paper bot
+        run: python python/bot.py --live --state data/paper_state.json
+
+      - name: Commit paper state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/paper_state.json
+          if git diff --staged --quiet; then
+            echo "No paper state change."
+            exit 0
+          fi
+          git commit -m "Update paper bot state"
+          git pull --rebase --autostash origin main
+          git push

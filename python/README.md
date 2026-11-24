@@ -12,7 +12,8 @@ app is the local version.
 - ZigZag overlay and HH / HL / LH / LL structure labels
 - Coin dropdown of liquid USDT-M contracts, including NEAR, INJ, RENDER, FET and ARB (default NEARUSDT)
 - Timeframes: 1m, 5m, 15m, 1h, 4h (default 15m)
-- Paper wallet with stop-loss, take-profit, margin, leverage, a shorts toggle, a structure filter, a trade ledger and an engine console
+- A **24/7 Paper Bot** panel that reads `data/paper_state.json` (or the GitHub copy) — the official simulated book that keeps running on GitHub Actions when this app is closed
+- A local sandbox paper wallet with stop-loss, take-profit, margin, leverage, a shorts toggle, a structure filter, a trade ledger and an engine console (this machine only, not the 24/7 bot)
 
 Default ZigZag reversal is **1.5%**, matching the existing dashboard and the 15m alert scanner. There are no live or testnet modes and no signed orders.
 
@@ -42,6 +43,18 @@ cd /workspace/zigzag-app
 source .venv/bin/activate
 streamlit run app.py
 ```
+
+## 24/7 paper bot
+
+The Streamlit app can show the official paper book, but it does not run that book in the background. The bot itself is the **Paper bot** GitHub Actions workflow in this repository (`*/5` cron). Run it locally with:
+
+```bash
+# from the repo root
+python python/bot.py --live --state data/paper_state.json
+python python/bot.py --backtest --out data/backtest.json
+```
+
+Rules, defaults and the “no stop-loss” policy are described in the root [README](../README.md). This bot is paper-only: no API keys, no real orders.
 
 ## Settings
 
