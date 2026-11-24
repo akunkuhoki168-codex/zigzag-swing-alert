@@ -10,7 +10,7 @@ app is the local version.
 
 - Live Binance USD-M candlesticks (public REST, no API key) with auto-refresh
 - ZigZag overlay and HH / HL / LH / LL structure labels
-- Coin dropdown: alert coins (NEAR, INJ, RENDER, FET, ARB) first, then a top-50 list
+- Coin dropdown of liquid USDT-M contracts, including NEAR, INJ, RENDER, FET and ARB (default NEARUSDT)
 - Timeframes: 1m, 5m, 15m, 1h, 4h (default 15m)
 - Paper wallet with stop-loss, take-profit, margin, leverage, a shorts toggle, a structure filter, a trade ledger and an engine console
 

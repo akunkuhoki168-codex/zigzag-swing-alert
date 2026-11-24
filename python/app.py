@@ -254,17 +254,12 @@ def main() -> None:
             unsafe_allow_html=True,
         )
     with mid:
-        symbol_labels = {
-            s: f"{Z.short_name(s)}" + ("  · alert" if s in Z.COINS else "")
-            for s in Z.ALL_COINS
-        }
         default_sym = "NEARUSDT" if "NEARUSDT" in Z.ALL_COINS else Z.ALL_COINS[0]
         symbol = st.selectbox(
             "Coin",
             Z.ALL_COINS,
             index=Z.ALL_COINS.index(default_sym),
-            format_func=lambda s: f"{Z.short_name(s)}" + ("  (alert)" if s in Z.COINS else ""),
-            help="Alert coins (NEAR, INJ, RENDER, FET, ARB) are listed first, then the top 50.",
+            format_func=lambda s: Z.short_name(s),
             key="coin",
         )
     with right:

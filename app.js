@@ -596,26 +596,17 @@
     }
   }
 
-  function addOption(group, sym) {
+  function addOption(select, sym) {
     var opt = document.createElement("option");
     opt.value = sym;
     opt.textContent = Z.shortName(sym);
-    group.appendChild(opt);
+    select.appendChild(opt);
   }
 
   function buildSwitcher() {
     var select = el.coinSelect;
     select.innerHTML = "";
-    var alerts = document.createElement("optgroup");
-    alerts.label = "Alert coins";
-    Z.COINS.forEach(function (sym) { addOption(alerts, sym); });
-    select.appendChild(alerts);
-    var more = document.createElement("optgroup");
-    more.label = "Top 50";
-    Z.ALL_COINS.forEach(function (sym) {
-      if (Z.COINS.indexOf(sym) === -1) addOption(more, sym);
-    });
-    select.appendChild(more);
+    Z.ALL_COINS.forEach(function (sym) { addOption(select, sym); });
     select.value = symbol;
     select.addEventListener("change", function () {
       var sym = select.value;
