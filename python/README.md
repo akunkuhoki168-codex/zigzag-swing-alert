@@ -62,7 +62,7 @@ Rules, defaults and the “no stop-loss” policy are described in the root [REA
 | --- | --- |
 | Reversal | 1.5% |
 | Stop loss | 1.5% |
-| Take profit | 3% |
+| Take profit | 1.5% |
 | Leverage | 1x |
 | Margin | 200 USDT |
 | Starting balance | 200 USDT |

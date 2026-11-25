@@ -5,13 +5,13 @@ Rules (bar-close confirmed ZigZag, default 1.5% reversal, 15m closed candles):
 
   LONG  entry: newly confirmed pivot labelled LL, filled at the confirming
                candle's close, only if Wilder RSI(14) at that close is below 32.
-  LONG  exit:  take-profit (default +3% from entry, checked against candle
+  LONG  exit:  take-profit (default +1.5% from entry, checked against candle
                highs; fill at the TP price) or a newly confirmed HH,
                whichever comes first. LH is ignored at all times. There is
                no stop-loss.
 
   SHORT is the mirror: enter on a confirmed HH only if RSI(14) is above 68,
-               take-profit at -3% (checked
+               take-profit at -1.5% (checked
                against candle lows). Exit on a confirmed LL. HL is ignored
                at all times.
 
@@ -61,7 +61,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "coins": ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"],
     "timeframe": "15m",
     "reversal_pct": 1.5,
-    "take_profit_pct": 3.0,
+    "take_profit_pct": 1.5,
     "starting_balance": 200.0,
     "notional": 200.0,
     "fee_pct": 0.04,  # percent, per side

@@ -345,10 +345,10 @@
         <span class="bot-live" id="botStatus">Loading state…</span>
       </div>
       <p class="bot-rules">
-        Long on a confirmed LL only if Wilder RSI(14) at that candle's close is below 32, then exit at +3% take-profit
+        Long on a confirmed LL only if Wilder RSI(14) at that candle's close is below 32, then exit at +1.5% take-profit
         (checked against the candle high; fill at the TP price) or a newly confirmed HH, whichever comes first.
         LH is ignored at all times.
-        Short is the opposite: enter on a confirmed HH only if RSI(14) is above 68, take-profit at −3% on the candle low,
+        Short is the opposite: enter on a confirmed HH only if RSI(14) is above 68, take-profit at −1.5% on the candle low,
         and exit only on a confirmed LL. HL is ignored at all times.
         There is no stop-loss. One position per coin on NEAR, INJ, RENDER, FET and ARB, 15m Binance USD-M candles,
         1.5% ZigZag reversal, 200 USDT notional, 0.04% fee per side, starting balance 200 USDT.
@@ -383,7 +383,7 @@
       </div>
       <div class="ctl">
         <label for="tpPct">Take profit %</label>
-        <input id="tpPct" type="number" min="0.1" max="100" step="0.1" value="3">
+        <input id="tpPct" type="number" min="0.1" max="100" step="0.1" value="1.5">
       </div>
       <div class="ctl">
         <label for="leverage">Leverage</label>
@@ -429,7 +429,7 @@
         <div class="card"><div id="console"></div></div>
       </div>
     </div>
-    <p class="note">ZigZag pivots confirm only on bar close, so they do not repaint. ZigZag Paper Bot is the official simulated book: it enters a long on a confirmed LL only if RSI(14) at that close is below 32, and a short on a confirmed HH only if RSI(14) is above 68. It exits on +3% take-profit or HH (longs) / LL (shorts), and has no stop-loss. LH and HL are ignored at all times. A same-candle reverse still closes the position, but the new entry opens only if RSI confirms. The official book keeps running on this box when this tab is closed. The local sandbox on this page is a separate what-if wallet stored in the browser; it is not the 24/7 book and it does not run after the tab is closed. This page never sends orders and never asks for an API key. Times are shown in Asia/Jakarta (WIB, UTC+7).</p>
+    <p class="note">ZigZag pivots confirm only on bar close, so they do not repaint. ZigZag Paper Bot is the official simulated book: it enters a long on a confirmed LL only if RSI(14) at that close is below 32, and a short on a confirmed HH only if RSI(14) is above 68. It exits on +1.5% take-profit or HH (longs) / LL (shorts), and has no stop-loss. LH and HL are ignored at all times. A same-candle reverse still closes the position, but the new entry opens only if RSI confirms. The official book keeps running on this box when this tab is closed. The local sandbox on this page is a separate what-if wallet stored in the browser; it is not the 24/7 book and it does not run after the tab is closed. This page never sends orders and never asks for an API key. Times are shown in Asia/Jakarta (WIB, UTC+7).</p>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@5.3.0/dist/lightweight-charts.standalone.production.js"></script>
@@ -775,15 +775,15 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var STORAGE_KEY = "zigzag-paper-bot-v2";
-  var LEGACY_STORAGE_KEYS = ["zigzag-paper-bot-v1", "zigzag-swing-alert-paper-v1", "adx-alert-paper-v1"];
+  var STORAGE_KEY = "zigzag-paper-bot-v3";
+  var LEGACY_STORAGE_KEYS = ["zigzag-paper-bot-v2", "zigzag-paper-bot-v1", "zigzag-swing-alert-paper-v1", "adx-alert-paper-v1"];
   var STARTING_BALANCE = 200;
   var TAKER_FEE = 0.0004;
   var MAX_TRADES = 200;
   var BOT_COINS = ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"];
   var DEFAULTS = {
     slPct: 0,
-    tpPct: 3,
+    tpPct: 1.5,
     leverage: 1,
     margin: 200,
     shorts: true,
@@ -1667,7 +1667,7 @@
       "Notional " + fmtPrice(cfg.notional || 200, 0) + " USDT",
       "Fee " + (cfg.fee_pct != null ? cfg.fee_pct : 0.04) + "%/side",
       "Reversal " + (cfg.reversal_pct != null ? cfg.reversal_pct : 1.5) + "%",
-      "TP " + (cfg.take_profit_pct != null ? cfg.take_profit_pct : 3) + "%",
+      "TP " + (cfg.take_profit_pct != null ? cfg.take_profit_pct : 1.5) + "%",
       note
     ].filter(Boolean).join(" · ");
 

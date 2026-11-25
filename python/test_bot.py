@@ -39,7 +39,7 @@ def pivot(kind: str, label: str, t: int, price: float) -> dict:
 
 
 CFG = bot.clamp_config({
-    "take_profit_pct": 3.0,
+    "take_profit_pct": 1.5,
     "notional": 200.0,
     "fee_pct": 0.04,
     "reversal_pct": 1.5,
@@ -88,13 +88,13 @@ class RuleTests(unittest.TestCase):
 
     def test_tp_hits_long_high_and_short_low(self):
         pos = bot._open_position("NEARUSDT", bar(1, 100, 100, 100, 100), pivot("LOW", "LL", 1, 99), CFG)
-        self.assertAlmostEqual(pos["tp"], 103.0)
-        self.assertTrue(bot.tp_hit(pos, bar(2, 101, 103, 100, 102)))
-        self.assertFalse(bot.tp_hit(pos, bar(2, 101, 102.9, 100, 102)))
+        self.assertAlmostEqual(pos["tp"], 101.5)
+        self.assertTrue(bot.tp_hit(pos, bar(2, 101, 101.5, 100, 102)))
+        self.assertFalse(bot.tp_hit(pos, bar(2, 101, 101.4, 100, 102)))
         short = bot._open_position("NEARUSDT", bar(1, 100, 100, 100, 100), pivot("HIGH", "HH", 1, 101), CFG)
-        self.assertAlmostEqual(short["tp"], 97.0)
-        self.assertTrue(bot.tp_hit(short, bar(2, 99, 100, 97, 98)))
-        self.assertFalse(bot.tp_hit(short, bar(2, 99, 100, 97.1, 98)))
+        self.assertAlmostEqual(short["tp"], 98.5)
+        self.assertTrue(bot.tp_hit(short, bar(2, 99, 100, 98.5, 98)))
+        self.assertFalse(bot.tp_hit(short, bar(2, 99, 100, 98.6, 98)))
 
     def test_tp_beats_structure_on_same_bar_and_reverses(self):
         pos = bot._open_position("NEARUSDT", bar(1, 100, 100, 100, 100), pivot("LOW", "LL", 1, 99), CFG)
@@ -105,7 +105,7 @@ class RuleTests(unittest.TestCase):
         )
         self.assertEqual(len(trades), 1)
         self.assertEqual(trades[0]["exit_reason"], "TP")
-        self.assertAlmostEqual(trades[0]["exit"], 103.0)
+        self.assertAlmostEqual(trades[0]["exit"], 101.5)
         self.assertIsNotNone(new_pos)
         self.assertEqual(new_pos["side"], "short")
         self.assertEqual(new_pos["entry_reason"], "HH")
@@ -114,12 +114,12 @@ class RuleTests(unittest.TestCase):
 
     def test_structure_exit_hh_reverses_to_short(self):
         pos = bot._open_position("NEARUSDT", bar(1, 100, 100, 100, 100), pivot("LOW", "LL", 1, 99), CFG)
-        b = bar(2, 101, 102, 100, 101.5)  # high below TP 103
+        b = bar(2, 101, 101.4, 100, 101.2)  # high below TP 101.5
         new_pos, trades, ev = bot.process_bar(
-            pos, b, [pivot("HIGH", "HH", 2, 102)], "NEARUSDT", CFG, 1, rsi=80
+            pos, b, [pivot("HIGH", "HH", 2, 101.4)], "NEARUSDT", CFG, 1, rsi=80
         )
         self.assertEqual(trades[0]["exit_reason"], "HH")
-        self.assertAlmostEqual(trades[0]["exit"], 101.5)
+        self.assertAlmostEqual(trades[0]["exit"], 101.2)
         self.assertEqual(new_pos["side"], "short")
 
     def test_losing_long_ignores_lh_stays_open(self):
@@ -133,7 +133,7 @@ class RuleTests(unittest.TestCase):
 
     def test_profitable_long_also_ignores_lh(self):
         pos = bot._open_position("NEARUSDT", bar(1, 100, 100, 100, 100), pivot("LOW", "LL", 1, 99), CFG)
-        b = bar(2, 101, 102, 100, 101.5)  # in profit, high below TP
+        b = bar(2, 101, 101.4, 100, 101.2)  # in profit, high below TP
         new_pos, trades, ev = bot.process_bar(
             pos, b, [pivot("HIGH", "LH", 2, 102)], "NEARUSDT", CFG, 1
         )
@@ -220,7 +220,7 @@ class RuleTests(unittest.TestCase):
 
     def test_exit_still_happens_when_reverse_rsi_blocked(self):
         pos = bot._open_position("NEARUSDT", bar(1, 100, 100, 100, 100), pivot("LOW", "LL", 1, 99), CFG)
-        b = bar(2, 101, 102, 100, 101.5)  # high below TP 103
+        b = bar(2, 101, 101.4, 100, 101.2)  # high below TP 101.5
         new_pos, trades, ev = bot.process_bar(
             pos, b, [pivot("HIGH", "HH", 2, 102)], "NEARUSDT", CFG, 1, rsi=50
         )
@@ -279,7 +279,7 @@ class WalkSeedTests(unittest.TestCase):
 
     def test_zigzag_ll_then_tp_on_synthetic_series(self):
         # Build a series that produces a labelled LL with RSI(14) still
-        # below 32 at the confirm close, then price runs +3% to hit TP.
+        # below 32 at the confirm close, then price runs +1.5% to hit TP.
         # First low is unlabeled; second lower low is LL. Bounces are just
         # over 1.5% so they confirm structure without lifting RSI above 32.
         candles = []
@@ -297,8 +297,8 @@ class WalkSeedTests(unittest.TestCase):
             (96.5, 96.5, 90, 91),     # lower low 90
             (91, 91.5, 90, 91.4),     # 90*1.015=91.35 confirms LL; close 91.4
         ])
-        # Entry close 91.4, TP = 91.4 * 1.03 = 94.142
-        seq.append((91.4, 94.5, 91.4, 94.2))  # high tags TP
+        # Entry close 91.4, TP = 91.4 * 1.015 = 92.771
+        seq.append((91.4, 93.0, 91.4, 92.9))  # high tags TP
         for o, h, l, c in seq:
             candles.append(bar(t, o, h, l, c))
             t += 900

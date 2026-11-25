@@ -12,7 +12,7 @@ TAKER_FEE = 0.0004
 MAX_TRADES = 200
 DEFAULTS = {
     "sl_pct": 1.5,
-    "tp_pct": 3.0,
+    "tp_pct": 1.5,
     "leverage": 1,
     "margin": 200.0,
     "shorts": True,

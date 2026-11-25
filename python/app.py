@@ -163,7 +163,7 @@ def render_bot_panel(bot: dict | None, source: str, symbol: str, last_px: float 
     st.caption(
         "Official simulated book. Long on confirmed LL only if RSI(14) at that close is below 32; "
         "short on confirmed HH only if RSI(14) is above 68. "
-        "A long exits on +3% TP or HH (LH is ignored). A short exits on +3% TP or LL (HL is ignored). "
+        "A long exits on +1.5% TP or HH (LH is ignored). A short exits on +1.5% TP or LL (HL is ignored). "
         "A same-candle reverse still closes on HH/LL, but the new entry opens only if RSI confirms. "
         "No stop-loss. Runs on GitHub Actions about every five minutes and does not need this app to stay open. "
         "Paper only — no API keys, no real orders."

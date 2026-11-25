@@ -14,8 +14,8 @@ The Pages chart only updates while a browser tab is open. The official paper boo
 
 Rules:
 
-- **Long** on a newly confirmed **LL**, filled at the confirming candle's close, only if Wilder **RSI(14)** at that close is **below 32**. Exit at **+3% take-profit** (checked against the candle high; fill at the TP price) or a newly confirmed **HH**, whichever comes first. **LH** is ignored at all times.
-- **Short** is the opposite: enter on a confirmed **HH** only if RSI(14) is **above 68**, take-profit at **−3%** on the candle low, and exit only on a confirmed **LL**. **HL** is ignored at all times.
+- **Long** on a newly confirmed **LL**, filled at the confirming candle's close, only if Wilder **RSI(14)** at that close is **below 32**. Exit at **+1.5% take-profit** (checked against the candle high; fill at the TP price) or a newly confirmed **HH**, whichever comes first. **LH** is ignored at all times.
+- **Short** is the opposite: enter on a confirmed **HH** only if RSI(14) is **above 68**, take-profit at **−1.5%** on the candle low, and exit only on a confirmed **LL**. **HL** is ignored at all times.
 - **No stop-loss.** One position per coin. If an opposite entry confirms on the same candle as an exit, the bot closes first and opens the reverse only if RSI also confirms that entry.
 - Starting balance **200 USDT**, fixed **200 USDT** notional per trade at 1x, **0.04%** fee per side. These defaults live in `python/bot.py` (`DEFAULT_CONFIG`) and are stored in `data/paper_state.json`.
 

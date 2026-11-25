@@ -427,7 +427,7 @@
       "Notional " + fmtPrice(cfg.notional || 200, 0) + " USDT",
       "Fee " + (cfg.fee_pct != null ? cfg.fee_pct : 0.04) + "%/side",
       "Reversal " + (cfg.reversal_pct != null ? cfg.reversal_pct : 1.5) + "%",
-      "TP " + (cfg.take_profit_pct != null ? cfg.take_profit_pct : 3) + "%",
+      "TP " + (cfg.take_profit_pct != null ? cfg.take_profit_pct : 1.5) + "%",
       note
     ].filter(Boolean).join(" · ");
 

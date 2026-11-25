@@ -8,15 +8,15 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var STORAGE_KEY = "zigzag-paper-bot-v2";
-  var LEGACY_STORAGE_KEYS = ["zigzag-paper-bot-v1", "zigzag-swing-alert-paper-v1", "adx-alert-paper-v1"];
+  var STORAGE_KEY = "zigzag-paper-bot-v3";
+  var LEGACY_STORAGE_KEYS = ["zigzag-paper-bot-v2", "zigzag-paper-bot-v1", "zigzag-swing-alert-paper-v1", "adx-alert-paper-v1"];
   var STARTING_BALANCE = 200;
   var TAKER_FEE = 0.0004;
   var MAX_TRADES = 200;
   var BOT_COINS = ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"];
   var DEFAULTS = {
     slPct: 0,
-    tpPct: 3,
+    tpPct: 1.5,
     leverage: 1,
     margin: 200,
     shorts: true,
