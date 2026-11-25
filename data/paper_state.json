@@ -28,13 +28,27 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-25T19:36:12Z",
-  "last_run_at_wib": "2026-11-26 02:36:12 WIB",
+  "last_run_at": "2026-11-25T20:32:49Z",
+  "last_run_at_wib": "2026-11-26 03:32:49 WIB",
   "cash": 205.6776,
-  "equity": 195.60444587,
+  "equity": 194.27978619,
   "realized_pnl": 5.6776,
   "positions": {
-    "NEARUSDT": null,
+    "NEARUSDT": {
+      "symbol": "NEARUSDT",
+      "side": "short",
+      "entry": 2.954,
+      "qty": 67.70480704129993,
+      "notional": 200.0,
+      "entry_fee": 0.08,
+      "entry_time": 1795636800,
+      "entry_close_time": 1795637699999,
+      "entry_reason": "HH",
+      "tp": 2.9096900000000003,
+      "pivot_time": 1795636800,
+      "pivot_price": 2.972,
+      "entry_rsi": 72.8739
+    },
     "INJUSDT": {
       "symbol": "INJUSDT",
       "side": "short",
@@ -137,18 +151,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795634100,
-    "INJUSDT": 1795634100,
-    "RENDERUSDT": 1795634100,
-    "FETUSDT": 1795634100,
-    "ARBUSDT": 1795634100
+    "NEARUSDT": 1795637700,
+    "INJUSDT": 1795637700,
+    "RENDERUSDT": 1795637700,
+    "FETUSDT": 1795637700,
+    "ARBUSDT": 1795637700
   },
   "last_prices": {
-    "NEARUSDT": 2.933,
-    "INJUSDT": 6.014,
-    "RENDERUSDT": 1.288,
-    "FETUSDT": 0.1093,
-    "ARBUSDT": 0.11206
+    "NEARUSDT": 2.997,
+    "INJUSDT": 6.032,
+    "RENDERUSDT": 1.285,
+    "FETUSDT": 0.1088,
+    "ARBUSDT": 0.11153
   },
   "errors": {},
   "events": [
@@ -182,7 +196,8 @@
     "2026-11-26 01:33:08 WIB  OPEN short FETUSDT HH @ 0.107400 RSI 68.16 > 68",
     "2026-11-26 01:33:08 WIB  OPEN short ARBUSDT HH @ 0.110710 RSI 68.31 > 68",
     "2026-11-26 02:36:12 WIB  SKIP short NEARUSDT HH RSI 66.76 not > 68",
-    "2026-11-26 02:36:12 WIB  OPEN short RENDERUSDT HH @ 1.286000 RSI 71.11 > 68"
+    "2026-11-26 02:36:12 WIB  OPEN short RENDERUSDT HH @ 1.286000 RSI 71.11 > 68",
+    "2026-11-26 03:32:49 WIB  OPEN short NEARUSDT HH @ 2.954000 RSI 72.87 > 68"
   ],
   "stats": {
     "trades": 2,
@@ -190,7 +205,7 @@
     "losses": 0,
     "flats": 0,
     "win_rate": 100.0,
-    "open": 4,
+    "open": 5,
     "gross_pnl": 5.6776
   }
 }
