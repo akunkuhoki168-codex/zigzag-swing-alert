@@ -28,17 +28,59 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-25T17:43:13Z",
-  "last_run_at_wib": "2026-11-26 00:43:13 WIB",
+  "last_run_at": "2026-11-25T18:33:08Z",
+  "last_run_at_wib": "2026-11-26 01:33:08 WIB",
   "cash": 205.6776,
-  "equity": 205.6776,
+  "equity": 204.56671718,
   "realized_pnl": 5.6776,
   "positions": {
     "NEARUSDT": null,
-    "INJUSDT": null,
+    "INJUSDT": {
+      "symbol": "INJUSDT",
+      "side": "short",
+      "entry": 5.921,
+      "qty": 33.778078027360245,
+      "notional": 200.0,
+      "entry_fee": 0.08,
+      "entry_time": 1795627800,
+      "entry_close_time": 1795628699999,
+      "entry_reason": "HH",
+      "tp": 5.832185,
+      "pivot_time": 1795627800,
+      "pivot_price": 5.954,
+      "entry_rsi": 69.4485
+    },
     "RENDERUSDT": null,
-    "FETUSDT": null,
-    "ARBUSDT": null
+    "FETUSDT": {
+      "symbol": "FETUSDT",
+      "side": "short",
+      "entry": 0.1074,
+      "qty": 1862.1973929236499,
+      "notional": 200.0,
+      "entry_fee": 0.08,
+      "entry_time": 1795627800,
+      "entry_close_time": 1795628699999,
+      "entry_reason": "HH",
+      "tp": 0.105789,
+      "pivot_time": 1795627800,
+      "pivot_price": 0.1077,
+      "entry_rsi": 68.159
+    },
+    "ARBUSDT": {
+      "symbol": "ARBUSDT",
+      "side": "short",
+      "entry": 0.11071,
+      "qty": 1806.5215427693975,
+      "notional": 200.0,
+      "entry_fee": 0.08,
+      "entry_time": 1795627800,
+      "entry_close_time": 1795628699999,
+      "entry_reason": "HH",
+      "tp": 0.10904935,
+      "pivot_time": 1795627800,
+      "pivot_price": 0.11097,
+      "entry_rsi": 68.308
+    }
   },
   "trades": [
     {
@@ -81,18 +123,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795626900,
-    "INJUSDT": 1795626900,
-    "RENDERUSDT": 1795626900,
-    "FETUSDT": 1795626900,
-    "ARBUSDT": 1795626900
+    "NEARUSDT": 1795630500,
+    "INJUSDT": 1795630500,
+    "RENDERUSDT": 1795630500,
+    "FETUSDT": 1795630500,
+    "ARBUSDT": 1795630500
   },
   "last_prices": {
-    "NEARUSDT": 2.809,
-    "INJUSDT": 5.857,
-    "RENDERUSDT": 1.26,
-    "FETUSDT": 0.1058,
-    "ARBUSDT": 0.10933
+    "NEARUSDT": 2.876,
+    "INJUSDT": 5.953,
+    "RENDERUSDT": 1.272,
+    "FETUSDT": 0.1071,
+    "ARBUSDT": 0.11077
   },
   "errors": {},
   "events": [
@@ -120,7 +162,11 @@
     "2026-11-26 00:43:13 WIB  SKIP short NEARUSDT HH RSI 56.08 not > 68",
     "2026-11-26 00:43:13 WIB  SKIP short FETUSDT HH RSI 53.90 not > 68",
     "2026-11-26 00:43:13 WIB  SKIP long ARBUSDT LL RSI 52.90 not < 32",
-    "2026-11-26 00:43:13 WIB  SKIP short ARBUSDT HH RSI 62.77 not > 68"
+    "2026-11-26 00:43:13 WIB  SKIP short ARBUSDT HH RSI 62.77 not > 68",
+    "2026-11-26 01:33:08 WIB  SKIP short NEARUSDT HH RSI 67.16 not > 68",
+    "2026-11-26 01:33:08 WIB  OPEN short INJUSDT HH @ 5.921000 RSI 69.45 > 68",
+    "2026-11-26 01:33:08 WIB  OPEN short FETUSDT HH @ 0.107400 RSI 68.16 > 68",
+    "2026-11-26 01:33:08 WIB  OPEN short ARBUSDT HH @ 0.110710 RSI 68.31 > 68"
   ],
   "stats": {
     "trades": 2,
@@ -128,7 +174,7 @@
     "losses": 0,
     "flats": 0,
     "win_rate": 100.0,
-    "open": 0,
+    "open": 3,
     "gross_pnl": 5.6776
   }
 }
