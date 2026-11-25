@@ -14,7 +14,7 @@
     ],
     "timeframe": "15m",
     "reversal_pct": 1.5,
-    "take_profit_pct": 3.0,
+    "take_profit_pct": 1.5,
     "starting_balance": 200.0,
     "notional": 200.0,
     "fee_pct": 0.04,
