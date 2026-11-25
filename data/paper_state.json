@@ -28,10 +28,10 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-25T18:33:08Z",
-  "last_run_at_wib": "2026-11-26 01:33:08 WIB",
+  "last_run_at": "2026-11-25T19:36:12Z",
+  "last_run_at_wib": "2026-11-26 02:36:12 WIB",
   "cash": 205.6776,
-  "equity": 204.56671718,
+  "equity": 195.60444587,
   "realized_pnl": 5.6776,
   "positions": {
     "NEARUSDT": null,
@@ -50,7 +50,21 @@
       "pivot_price": 5.954,
       "entry_rsi": 69.4485
     },
-    "RENDERUSDT": null,
+    "RENDERUSDT": {
+      "symbol": "RENDERUSDT",
+      "side": "short",
+      "entry": 1.286,
+      "qty": 155.52099533437013,
+      "notional": 200.0,
+      "entry_fee": 0.08,
+      "entry_time": 1795633200,
+      "entry_close_time": 1795634099999,
+      "entry_reason": "HH",
+      "tp": 1.26671,
+      "pivot_time": 1795633200,
+      "pivot_price": 1.289,
+      "entry_rsi": 71.1134
+    },
     "FETUSDT": {
       "symbol": "FETUSDT",
       "side": "short",
@@ -123,18 +137,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795630500,
-    "INJUSDT": 1795630500,
-    "RENDERUSDT": 1795630500,
-    "FETUSDT": 1795630500,
-    "ARBUSDT": 1795630500
+    "NEARUSDT": 1795634100,
+    "INJUSDT": 1795634100,
+    "RENDERUSDT": 1795634100,
+    "FETUSDT": 1795634100,
+    "ARBUSDT": 1795634100
   },
   "last_prices": {
-    "NEARUSDT": 2.876,
-    "INJUSDT": 5.953,
-    "RENDERUSDT": 1.272,
-    "FETUSDT": 0.1071,
-    "ARBUSDT": 0.11077
+    "NEARUSDT": 2.933,
+    "INJUSDT": 6.014,
+    "RENDERUSDT": 1.288,
+    "FETUSDT": 0.1093,
+    "ARBUSDT": 0.11206
   },
   "errors": {},
   "events": [
@@ -166,7 +180,9 @@
     "2026-11-26 01:33:08 WIB  SKIP short NEARUSDT HH RSI 67.16 not > 68",
     "2026-11-26 01:33:08 WIB  OPEN short INJUSDT HH @ 5.921000 RSI 69.45 > 68",
     "2026-11-26 01:33:08 WIB  OPEN short FETUSDT HH @ 0.107400 RSI 68.16 > 68",
-    "2026-11-26 01:33:08 WIB  OPEN short ARBUSDT HH @ 0.110710 RSI 68.31 > 68"
+    "2026-11-26 01:33:08 WIB  OPEN short ARBUSDT HH @ 0.110710 RSI 68.31 > 68",
+    "2026-11-26 02:36:12 WIB  SKIP short NEARUSDT HH RSI 66.76 not > 68",
+    "2026-11-26 02:36:12 WIB  OPEN short RENDERUSDT HH @ 1.286000 RSI 71.11 > 68"
   ],
   "stats": {
     "trades": 2,
@@ -174,7 +190,7 @@
     "losses": 0,
     "flats": 0,
     "win_rate": 100.0,
-    "open": 3,
+    "open": 4,
     "gross_pnl": 5.6776
   }
 }
