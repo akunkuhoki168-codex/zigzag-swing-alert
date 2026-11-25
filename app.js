@@ -316,6 +316,14 @@
       lineStyle: LC.LineStyle.Dashed, axisLabelVisible: true, title: "70",
     });
     rsiSeries.createPriceLine({
+      price: 68, color: "#fcd535", lineWidth: 1,
+      lineStyle: LC.LineStyle.Dotted, axisLabelVisible: true, title: "68",
+    });
+    rsiSeries.createPriceLine({
+      price: 32, color: "#fcd535", lineWidth: 1,
+      lineStyle: LC.LineStyle.Dotted, axisLabelVisible: true, title: "32",
+    });
+    rsiSeries.createPriceLine({
       price: 30, color: "#848e9c", lineWidth: 1,
       lineStyle: LC.LineStyle.Dashed, axisLabelVisible: true, title: "30",
     });
@@ -397,7 +405,7 @@
       eq += u;
       openList.push({ pos: pos, px: px, u: u });
     });
-    var start = Number(cfg.starting_balance) || 10000;
+    var start = Number(cfg.starting_balance) || 200;
     el.botEquity.textContent = fmtPrice(eq, 2) + " USDT";
     el.botEquity.className = "val " + (eq >= start ? "up" : "down");
     var wr = stats.win_rate;
@@ -416,7 +424,7 @@
       src ? ("Feed " + src + (market ? " · " + market : "")) : "",
       "No stop-loss",
       "Starting " + fmtPrice(start, 0) + " USDT",
-      "Notional " + fmtPrice(cfg.notional || 1000, 0) + " USDT",
+      "Notional " + fmtPrice(cfg.notional || 200, 0) + " USDT",
       "Fee " + (cfg.fee_pct != null ? cfg.fee_pct : 0.04) + "%/side",
       "Reversal " + (cfg.reversal_pct != null ? cfg.reversal_pct : 1.5) + "%",
       "TP " + (cfg.take_profit_pct != null ? cfg.take_profit_pct : 3) + "%",
@@ -564,6 +572,8 @@
     var rsiPoints = rsiWilder(candles, 14);
     rsiSeries.setData(rsiPoints);
     rsiSeries.applyOptions({ title: latestRsiTitle(rsiPoints) });
+    var rsiMap = {};
+    rsiPoints.forEach(function (pt) { rsiMap[pt.time] = pt.value; });
 
     var zzMarks = zz.pivots.filter(function (p) { return p.label; }).map(function (p) {
       var bull = p.label === "HH" || p.label === "HL";
@@ -576,7 +586,26 @@
         size: 0.8,
       };
     });
-    zzMarkersApi.setMarkers(zzMarks.concat(botMarkers()));
+    var rsiBlocks = zz.pivots.filter(function (p) {
+      var sig = Z.signalForPivot(p);
+      if (!sig) return false;
+      var rsi = rsiMap[p.confirmTime];
+      var side = sig.side;
+      var check = P.rsiEntryOk(side, rsi);
+      return !check.ok;
+    }).map(function (p) {
+      var rsi = rsiMap[p.confirmTime];
+      var note = P.rsiEntryOk(Z.signalForPivot(p).side, rsi).note;
+      return {
+        time: p.confirmTime || p.time,
+        position: p.type === "LOW" ? "belowBar" : "aboveBar",
+        color: "#848e9c",
+        shape: "square",
+        text: "RSI block",
+        size: 0.7,
+      };
+    });
+    zzMarkersApi.setMarkers(zzMarks.concat(rsiBlocks, botMarkers()));
     updateBotTpLine();
     if (botState) renderBot();
 
@@ -593,8 +622,15 @@
     var lastPivot = zz.pivots.length ? zz.pivots[zz.pivots.length - 1] : null;
     var lastSig = Z.signalForPivot(lastPivot);
     if (lastSig) {
-      el.sig.textContent = lastSig.signal;
-      el.sig.className = "val " + lastSig.signal;
+      var lastRsi = lastPivot ? rsiMap[lastPivot.confirmTime] : null;
+      var lastCheck = P.rsiEntryOk(lastSig.side, lastRsi);
+      if (lastCheck.ok) {
+        el.sig.textContent = lastSig.signal;
+        el.sig.className = "val " + lastSig.signal;
+      } else {
+        el.sig.textContent = lastSig.signal + " blocked";
+        el.sig.className = "val";
+      }
     } else {
       el.sig.textContent = "—";
       el.sig.className = "val";
@@ -611,30 +647,48 @@
     el.trend.className = "val " + (zz.trendKind === "up" ? "up" : zz.trendKind === "down" ? "down" : "");
     el.trigger.textContent = zz.trigger != null ? fmtPrice(zz.trigger, dec) : "—";
 
-    renderList(zz.pivots, dec);
+    renderList(zz.pivots, dec, rsiMap);
     onMarketUpdate(closedRows, zz, lastPx, dec);
     el.msg.style.display = "none";
   }
 
-  function renderList(pivots, dec) {
+  function renderList(pivots, dec, rsiMap) {
     if (!pivots.length) {
       el.signals.innerHTML = '<div class="empty">No confirmed ZigZag pivots in the last ' + klines.length + " " + tf + " candles.</div>";
       return;
     }
+    rsiMap = rsiMap || {};
     var rows = pivots.slice().reverse();
     var html = '<div class="sig-head"><div>Time (WIB)</div><div>Signal</div><div>Label</div><div>Pivot</div></div>';
     html += rows.map(function (p) {
       var closeMs = p.confirmCloseTime || (p.confirmTime ? p.confirmTime * 1000 : p.time * 1000);
       var w = Z.formatWib(closeMs);
-      var sig = p.type === "LOW" ? "long" : "short";
-      var cls = p.type === "LOW" ? "LONG" : "SHORT";
+      var sig = Z.signalForPivot(p);
+      var rsi = rsiMap[p.confirmTime];
+      var dir, cls, label;
+      if (sig) {
+        var check = P.rsiEntryOk(sig.side, rsi);
+        if (check.ok) {
+          dir = sig.signal;
+          cls = sig.side;
+          label = dir + " · " + check.note;
+        } else {
+          dir = sig.signal + " blocked";
+          cls = "BLOCK";
+          label = dir + " · " + check.note;
+        }
+      } else {
+        dir = "—";
+        cls = "";
+        label = (p.label || p.type) + (rsi != null ? " · RSI " + Number(rsi).toFixed(2) : "");
+      }
       return (
         '<div class="sig-row">' +
           '<div class="when">' + w.time + "<small>" + w.date + "</small></div>" +
-          '<div><span class="dir ' + cls + '">' + sig + " (unconfirmed)</span></div>" +
-          '<div class="hide-sm">' + (p.label || p.type) + "</div>" +
+          '<div><span class="dir ' + cls + '">' + dir + "</span></div>" +
+          '<div class="hide-sm">' + (p.label || p.type) + (rsi != null && sig ? " · RSI " + Number(rsi).toFixed(2) : "") + "</div>" +
           '<div class="hide-sm">' + fmtPrice(p.price, dec) + "</div>" +
-          '<div class="meta">' + (p.label || p.type) + " · " + fmtPrice(p.price, dec) + "</div>" +
+          '<div class="meta">' + label + " · " + fmtPrice(p.price, dec) + "</div>" +
         "</div>"
       );
     }).join("");
@@ -651,6 +705,11 @@
 
   function logPaperEvents(events) {
     (events || []).forEach(function (ev) {
+      if (ev.type === "skip") {
+        var pv = ev.pivot || {};
+        logEngine("RSI blocked " + String(ev.side || "").toLowerCase() + " " + Z.shortName(ev.symbol) + " " + (pv.label || "") + " · " + (ev.reason || "RSI filter"), "WARN");
+        return;
+      }
       if (ev.type === "close") {
         var tr = ev.trade;
         logEngine("Closed " + tr.side + " " + Z.shortName(tr.symbol) + " · " + tr.exitReason + " · PnL " + fmtPrice(tr.pnl, 2), tr.pnl >= 0 ? "OK" : "ERR");
@@ -959,7 +1018,7 @@
   }
 
   function resetWallet() {
-    if (!window.confirm("Reset the paper wallet to 10,000 USDT and clear the trade ledger?")) return;
+    if (!window.confirm("Reset the paper wallet to 200 USDT and clear the trade ledger?")) return;
     var on = paper.engineOn;
     var params = paper.params;
     paper = P.reset(paper);
@@ -968,7 +1027,7 @@
     P.save(paper);
     fillFormFromState();
     setEngineButton();
-    logEngine("Paper wallet reset to 10,000 USDT.", "WARN");
+    logEngine("Paper wallet reset to 200 USDT.", "WARN");
     renderLedger();
   }
 

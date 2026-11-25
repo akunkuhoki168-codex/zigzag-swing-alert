@@ -4,13 +4,14 @@
 Rules (bar-close confirmed ZigZag, default 1.5% reversal, 15m closed candles):
 
   LONG  entry: newly confirmed pivot labelled LL, filled at the confirming
-               candle's close.
+               candle's close, only if Wilder RSI(14) at that close is below 32.
   LONG  exit:  take-profit (default +3% from entry, checked against candle
                highs; fill at the TP price) or a newly confirmed HH,
                whichever comes first. LH is ignored at all times. There is
                no stop-loss.
 
-  SHORT is the mirror: enter on a confirmed HH, take-profit at -3% (checked
+  SHORT is the mirror: enter on a confirmed HH only if RSI(14) is above 68,
+               take-profit at -3% (checked
                against candle lows). Exit on a confirmed LL. HL is ignored
                at all times.
 
@@ -61,10 +62,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "timeframe": "15m",
     "reversal_pct": 1.5,
     "take_profit_pct": 3.0,
-    "starting_balance": 10000.0,
-    "notional": 1000.0,
+    "starting_balance": 200.0,
+    "notional": 200.0,
     "fee_pct": 0.04,  # percent, per side
     "stop_loss": False,
+    "rsi_period": 14,
+    "rsi_long_max": 32.0,
+    "rsi_short_min": 68.0,
 }
 
 # USD-M first, then public mirrors, then spot as a last resort.
@@ -120,6 +124,9 @@ def clamp_config(raw: dict | None = None) -> dict[str, Any]:
         "notional": fnum("notional", 10.0, 1_000_000.0),
         "fee_pct": fnum("fee_pct", 0.0, 1.0),
         "stop_loss": False,
+        "rsi_period": int(round(fnum("rsi_period", 2.0, 100.0))),
+        "rsi_long_max": fnum("rsi_long_max", 0.0, 100.0),
+        "rsi_short_min": fnum("rsi_short_min", 0.0, 100.0),
     }
 
 
@@ -131,12 +138,14 @@ def empty_state(config: dict | None = None) -> dict[str, Any]:
         "no_real_orders": True,
         "no_stop_loss": True,
         "rules": (
-            "Long on confirmed LL, exit at +TP% (on candle high) or a confirmed "
-            "HH, whichever comes first. LH is ignored at all times. Short is the "
-            "mirror: enter on HH, TP on candle low, exit only on a confirmed LL. "
-            "HL is ignored at all times. No stop-loss. One position per coin. "
+            "Long on confirmed LL only if RSI(14) at the confirming close is below "
+            "32. Exit at +TP% (on candle high) or a confirmed HH, whichever comes "
+            "first. LH is ignored at all times. Short is the mirror: enter on HH "
+            "only if RSI(14) is above 68, TP on candle low, exit only on a confirmed "
+            "LL. HL is ignored at all times. No stop-loss. One position per coin. "
             "Reverse if an opposite entry confirms on the same candle as an exit "
-            "(HH closes a long and opens a short; LL is the mirror)."
+            "and RSI also confirms that entry (HH closes a long and may open a "
+            "short; LL is the mirror)."
         ),
         "config": cfg,
         "data_source": None,
@@ -237,6 +246,64 @@ def is_profit_or_flat(side: str, entry: float, close: float) -> bool:
     return close <= entry
 
 
+
+def rsi_wilder(candles: list, period: int = 14) -> list[dict]:
+    """Wilder's RSI on closed-candle closes. First value is at index `period`."""
+    points: list[dict] = []
+    if not candles or period < 1 or len(candles) < period + 1:
+        return points
+    avg_gain = 0.0
+    avg_loss = 0.0
+    for i in range(1, period + 1):
+        change = float(candles[i]["close"]) - float(candles[i - 1]["close"])
+        if change > 0:
+            avg_gain += change
+        else:
+            avg_loss -= change
+    avg_gain /= period
+    avg_loss /= period
+
+    def value_of(gain: float, loss: float) -> float:
+        if loss == 0:
+            return 100.0
+        if gain == 0:
+            return 0.0
+        return 100.0 - 100.0 / (1.0 + gain / loss)
+
+    points.append({"time": candles[period]["time"], "value": value_of(avg_gain, avg_loss)})
+    for i in range(period + 1, len(candles)):
+        change = float(candles[i]["close"]) - float(candles[i - 1]["close"])
+        gain = change if change > 0 else 0.0
+        loss = -change if change < 0 else 0.0
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
+        points.append({"time": candles[i]["time"], "value": value_of(avg_gain, avg_loss)})
+    return points
+
+
+def rsi_at(candles: list, time: int, period: int = 14) -> float | None:
+    for pt in rsi_wilder(candles, period):
+        if int(pt["time"]) == int(time):
+            return float(pt["value"])
+    return None
+
+
+def rsi_entry_ok(side: str, rsi: float | None, config: dict) -> tuple[bool, str]:
+    """LONG only if RSI < rsi_long_max; SHORT only if RSI > rsi_short_min."""
+    long_max = float(config.get("rsi_long_max") if config.get("rsi_long_max") is not None else 32)
+    short_min = float(config.get("rsi_short_min") if config.get("rsi_short_min") is not None else 68)
+    if rsi is None:
+        return False, "RSI n/a"
+    if side == "long":
+        ok = rsi < long_max
+        cmp = "<" if ok else "not <"
+        return ok, f"RSI {rsi:.2f} {cmp} {long_max:g}"
+    if side == "short":
+        ok = rsi > short_min
+        cmp = ">" if ok else "not >"
+        return ok, f"RSI {rsi:.2f} {cmp} {short_min:g}"
+    return False, "no side"
+
 def entry_side(pivot: dict | None) -> str | None:
     if not pivot:
         return None
@@ -320,6 +387,7 @@ def process_bar(
     symbol: str,
     config: dict,
     next_trade_id: int,
+    rsi: float | None = None,
 ) -> tuple[dict | None, list[dict], list[str]]:
     """Apply TP, then structure exits, then entries, on one closed candle.
 
@@ -365,11 +433,19 @@ def process_bar(
             if exit_side and side == exit_side:
                 # Just closed this side on this candle; do not immediately re-enter.
                 continue
+            ok, note = rsi_entry_ok(side, rsi, config)
+            if not ok:
+                events.append(
+                    f"SKIP {side} {symbol} {pivot['label']} {note}"
+                )
+                continue
             position = _open_position(symbol, bar, pivot, config)
+            if rsi is not None:
+                position["entry_rsi"] = round(float(rsi), 4)
             opened_this_bar = True
             tag = "REVERSE " if exit_side and side != exit_side else ""
             events.append(
-                f"{tag}OPEN {side} {symbol} {pivot['label']} @ {bar['close']:.6f}"
+                f"{tag}OPEN {side} {symbol} {pivot['label']} @ {bar['close']:.6f} {note}"
             )
             break
 
@@ -396,6 +472,8 @@ def walk(
     by_confirm: dict[int, list[dict]] = {}
     for p in zz["pivots"]:
         by_confirm.setdefault(int(p["confirm_time"]), []).append(p)
+    rsi_period = int(config.get("rsi_period") or 14)
+    rsi_by_time = {int(pt["time"]): float(pt["value"]) for pt in rsi_wilder(series, rsi_period)}
 
     trades: list[dict] = []
     events: list[str] = []
@@ -408,7 +486,8 @@ def walk(
         acted += 1
         confirmed = by_confirm.get(t, [])
         position, new_trades, ev = process_bar(
-            position, bar, confirmed, symbol, config, next_trade_id
+            position, bar, confirmed, symbol, config, next_trade_id,
+            rsi=rsi_by_time.get(t),
         )
         next_trade_id += len(new_trades)
         trades.extend(new_trades)
@@ -694,9 +773,9 @@ def _count_reasons(rows: list[dict]) -> dict[str, int]:
     return out
 
 
-def run_backtest(out_path: Path | None = None) -> dict[str, Any]:
-    cfg = clamp_config()
-    # Shared cash book so the summary resembles a 10,000 starting balance,
+def run_backtest(out_path: Path | None = None, config: dict | None = None) -> dict[str, Any]:
+    cfg = clamp_config(config)
+    # Shared cash book so the summary resembles a 200 starting balance,
     # but per-coin stats stay independent in the report.
     positions: dict[str, Any] = {c: None for c in cfg["coins"]}
     last_prices: dict[str, float] = {}

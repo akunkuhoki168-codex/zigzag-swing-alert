@@ -63,9 +63,10 @@ Rules, defaults and the “no stop-loss” policy are described in the root [REA
 | Reversal | 1.5% |
 | Stop loss | 1.5% |
 | Take profit | 3% |
-| Leverage | 5x |
-| Margin | 100 USDT |
-| Starting balance | 10,000 USDT |
+| Leverage | 1x |
+| Margin | 200 USDT |
+| Starting balance | 200 USDT |
+| Bot notional | 200 USDT |
 | Shorts | on |
 | Structure filter (HL / LH only) | off |
 | Default coin | NEARUSDT |

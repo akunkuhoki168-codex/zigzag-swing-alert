@@ -161,8 +161,11 @@ def add_bot_markers(fig: go.Figure, bot: dict | None, symbol: str) -> None:
 def render_bot_panel(bot: dict | None, source: str, symbol: str, last_px: float | None) -> None:
     st.subheader("24/7 Paper Bot")
     st.caption(
-        "Official simulated book. Long on confirmed LL, short on confirmed HH, no stop-loss. "
-        "Runs on GitHub Actions about every five minutes and does not need this app to stay open. "
+        "Official simulated book. Long on confirmed LL only if RSI(14) at that close is below 32; "
+        "short on confirmed HH only if RSI(14) is above 68. "
+        "A long exits on +3% TP or HH (LH is ignored). A short exits on +3% TP or LL (HL is ignored). "
+        "A same-candle reverse still closes on HH/LL, but the new entry opens only if RSI confirms. "
+        "No stop-loss. Runs on GitHub Actions about every five minutes and does not need this app to stay open. "
         "Paper only — no API keys, no real orders."
     )
     if not bot:
@@ -190,7 +193,7 @@ def render_bot_panel(bot: dict | None, source: str, symbol: str, last_px: float 
         })
     stats = bot.get("stats") or {}
     c1, c2, c3, c4 = st.columns(4)
-    start = float(cfg.get("starting_balance") or 10000)
+    start = float(cfg.get("starting_balance") or 200)
     c1.metric("Bot equity", f"{data.fmt_price(eq, 2)} USDT", delta=round(eq - start, 2))
     c2.metric("Win rate", f"{stats.get('win_rate', 0):.1f}%" if stats.get("trades") else "—")
     c3.metric("Open positions", str(len(open_rows)))
@@ -404,7 +407,7 @@ def main() -> None:
     if c2.button("Reset wallet", use_container_width=True):
         st.session_state.paper = paper.reset(state)
         persist()
-        log("Paper wallet reset to 10,000 USDT.", "warn")
+        log("Paper wallet reset to 200 USDT.", "warn")
         st.rerun()
 
     # ---- header ----

@@ -3,7 +3,7 @@
   "mode": "paper",
   "no_real_orders": true,
   "no_stop_loss": true,
-  "rules": "Long on confirmed LL, exit at +TP% (on candle high) or a confirmed swing high, whichever comes first. In profit/flat, HH or LH exits; in a loss, only HH (LH is ignored). Short is the mirror: enter on HH, TP on candle low, exit on LL/HL in profit/flat, only LL in a loss. No stop-loss. One position per coin. Reverse if an opposite entry confirms on the same candle as an exit.",
+  "rules": "Long on confirmed LL only if RSI(14) at the confirming close is below 32. Exit at +TP% (on candle high) or a confirmed HH, whichever comes first. LH is ignored at all times. Short is the mirror: enter on HH only if RSI(14) is above 68, TP on candle low, exit only on a confirmed LL. HL is ignored at all times. No stop-loss. One position per coin. Reverse if an opposite entry confirms on the same candle as an exit and RSI also confirms that entry (HH closes a long and may open a short; LL is the mirror).",
   "config": {
     "coins": [
       "NEARUSDT",
@@ -15,20 +15,23 @@
     "timeframe": "15m",
     "reversal_pct": 1.5,
     "take_profit_pct": 3.0,
-    "starting_balance": 10000.0,
-    "notional": 1000.0,
+    "starting_balance": 200.0,
+    "notional": 200.0,
     "fee_pct": 0.04,
-    "stop_loss": false
+    "stop_loss": false,
+    "rsi_period": 14,
+    "rsi_long_max": 32.0,
+    "rsi_short_min": 68.0
   },
-  "data_source": "www.binance.com",
+  "data_source": "fapi.binance.com",
   "data_market": "usd-m",
-  "data_note": "USD-M klines from www.binance.com.",
-  "started_at": "2026-11-24T03:40:14Z",
-  "started_at_wib": "2026-11-24 10:40:14 WIB",
-  "last_run_at": "2026-11-24T03:41:40Z",
-  "last_run_at_wib": "2026-11-24 10:41:40 WIB",
-  "cash": 10000.0,
-  "equity": 10000.0,
+  "data_note": "USD-M klines from fapi.binance.com.",
+  "started_at": "2026-11-25T10:46:29Z",
+  "started_at_wib": "2026-11-25 17:46:29 WIB",
+  "last_run_at": "2026-11-25T10:50:30Z",
+  "last_run_at_wib": "2026-11-25 17:50:30 WIB",
+  "cash": 200.0,
+  "equity": 200.0,
   "realized_pnl": 0.0,
   "positions": {
     "NEARUSDT": null,
@@ -39,18 +42,18 @@
   },
   "trades": [],
   "last_processed": {
-    "NEARUSDT": 1795490100,
-    "INJUSDT": 1795490100,
-    "RENDERUSDT": 1795490100,
-    "FETUSDT": 1795490100,
-    "ARBUSDT": 1795490100
+    "NEARUSDT": 1795602600,
+    "INJUSDT": 1795602600,
+    "RENDERUSDT": 1795602600,
+    "FETUSDT": 1795602600,
+    "ARBUSDT": 1795602600
   },
   "last_prices": {
-    "NEARUSDT": 2.929,
-    "INJUSDT": 6.163,
-    "RENDERUSDT": 1.279,
-    "FETUSDT": 0.1074,
-    "ARBUSDT": 0.1129
+    "NEARUSDT": 2.832,
+    "INJUSDT": 5.767,
+    "RENDERUSDT": 1.239,
+    "FETUSDT": 0.1052,
+    "ARBUSDT": 0.10759
   },
   "errors": {},
   "events": [],

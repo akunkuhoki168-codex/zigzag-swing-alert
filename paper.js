@@ -1,15 +1,16 @@
 /* Browser-only simulated futures wallet. Never places real orders.
-   Rules match ZigZag Paper Bot: long on LL, exit +TP or HH (LH ignored);
-   short on HH, exit +TP or LL (HL ignored). No stop-loss by default. */
+   Rules match ZigZag Paper Bot: long on LL only if RSI(14) < 32,
+   short on HH only if RSI(14) > 68; exit +TP or HH/LL (LH/HL ignored).
+   No stop-loss by default. */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
   else root.PaperWallet = factory();
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var STORAGE_KEY = "zigzag-paper-bot-v1";
-  var LEGACY_STORAGE_KEYS = ["zigzag-swing-alert-paper-v1", "adx-alert-paper-v1"];
-  var STARTING_BALANCE = 10000;
+  var STORAGE_KEY = "zigzag-paper-bot-v2";
+  var LEGACY_STORAGE_KEYS = ["zigzag-paper-bot-v1", "zigzag-swing-alert-paper-v1", "adx-alert-paper-v1"];
+  var STARTING_BALANCE = 200;
   var TAKER_FEE = 0.0004;
   var MAX_TRADES = 200;
   var BOT_COINS = ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"];
@@ -17,10 +18,13 @@
     slPct: 0,
     tpPct: 3,
     leverage: 1,
-    margin: 1000,
+    margin: 200,
     shorts: true,
     reversalPct: 1.5,
   };
+  var RSI_PERIOD = 14;
+  var RSI_LONG_MAX = 32;
+  var RSI_SHORT_MIN = 68;
 
   function nowMs() {
     return Date.now();
@@ -176,6 +180,57 @@
     return { sl: sl > 0 ? entry * (1 - sl) : null, tp: entry * (1 + tp) };
   }
 
+
+  function rsiWilder(candles, period) {
+    period = period || RSI_PERIOD;
+    var points = [];
+    if (!candles || candles.length < period + 1) return points;
+    var avgGain = 0;
+    var avgLoss = 0;
+    var i;
+    for (i = 1; i <= period; i++) {
+      var seed = candles[i].close - candles[i - 1].close;
+      if (seed > 0) avgGain += seed;
+      else avgLoss -= seed;
+    }
+    avgGain /= period;
+    avgLoss /= period;
+    function valueOf(gain, loss) {
+      if (loss === 0) return 100;
+      if (gain === 0) return 0;
+      return 100 - 100 / (1 + gain / loss);
+    }
+    points.push({ time: candles[period].time, value: valueOf(avgGain, avgLoss) });
+    for (i = period + 1; i < candles.length; i++) {
+      var change = candles[i].close - candles[i - 1].close;
+      var gain = change > 0 ? change : 0;
+      var loss = change < 0 ? -change : 0;
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      points.push({ time: candles[i].time, value: valueOf(avgGain, avgLoss) });
+    }
+    return points;
+  }
+
+  function rsiByTime(candles, period) {
+    var map = {};
+    rsiWilder(candles, period || RSI_PERIOD).forEach(function (p) { map[p.time] = p.value; });
+    return map;
+  }
+
+  function rsiEntryOk(side, rsi) {
+    if (rsi == null || !isFinite(rsi)) return { ok: false, note: "RSI n/a" };
+    if (side === "LONG") {
+      var okL = rsi < RSI_LONG_MAX;
+      return { ok: okL, note: "RSI " + rsi.toFixed(2) + (okL ? " < " : " not < ") + RSI_LONG_MAX };
+    }
+    if (side === "SHORT") {
+      var okS = rsi > RSI_SHORT_MIN;
+      return { ok: okS, note: "RSI " + rsi.toFixed(2) + (okS ? " > " : " not > ") + RSI_SHORT_MIN };
+    }
+    return { ok: false, note: "no side" };
+  }
+
   function entrySide(pivot) {
     if (!pivot) return null;
     if (pivot.label === "LL" && pivot.type === "LOW") return "LONG";
@@ -284,7 +339,7 @@
    * A position opened on this bar is not checked for TP or structure on the same bar.
    * After an exit, only an opposite-side entry on this same candle is taken.
    */
-  function processBar(state, symbol, bar, confirmed, tf) {
+  function processBar(state, symbol, bar, confirmed, tf, rsi) {
     var events = [];
     var params = state.params;
     var position = (state.positions || {})[symbol] || null;
@@ -328,16 +383,22 @@
         var side = entrySide(pivot);
         if (!side) continue;
         if (exitSide && side === exitSide) continue;
+        var check = rsiEntryOk(side, rsi);
+        if (!check.ok) {
+          events.push({ type: "skip", side: side, symbol: symbol, pivot: pivot, rsi: rsi, reason: check.note });
+          continue;
+        }
         var opened = openPosition(state, {
           symbol: symbol,
           tf: tf || "15m",
           side: side,
           price: bar.close,
           bar: bar,
-          reason: "ZigZag " + (pivot.label || pivot.type),
+          reason: "ZigZag " + (pivot.label || pivot.type) + " " + check.note,
         });
         if (opened.ok) {
-          events.push({ type: exitSide && side !== exitSide ? "reverse" : "open", position: opened.position, pivot: pivot });
+          opened.position.entryRsi = rsi;
+          events.push({ type: exitSide && side !== exitSide ? "reverse" : "open", position: opened.position, pivot: pivot, rsi: rsi });
         }
         break;
       }
@@ -363,11 +424,12 @@
       state.lastPrices[symbol] = candles[candles.length - 1].close;
       return events;
     }
+    var rsiMap = rsiByTime(candles, RSI_PERIOD);
     var i;
     for (i = 0; i < candles.length; i++) {
       var bar = candles[i];
       if (bar.time <= startAfter) continue;
-      events = events.concat(processBar(state, symbol, bar, byConfirm[bar.time] || [], tf));
+      events = events.concat(processBar(state, symbol, bar, byConfirm[bar.time] || [], tf, rsiMap[bar.time]));
       state.lastProcessed[symbol] = bar.time;
       state.lastPrices[symbol] = bar.close;
     }
@@ -398,6 +460,12 @@
     flattenAll: flattenAll,
     processBar: processBar,
     walkSymbol: walkSymbol,
+    rsiWilder: rsiWilder,
+    rsiByTime: rsiByTime,
+    rsiEntryOk: rsiEntryOk,
+    RSI_PERIOD: RSI_PERIOD,
+    RSI_LONG_MAX: RSI_LONG_MAX,
+    RSI_SHORT_MIN: RSI_SHORT_MIN,
     round: round,
   };
 });

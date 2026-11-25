@@ -14,10 +14,10 @@ The Pages chart only updates while a browser tab is open. The official paper boo
 
 Rules:
 
-- **Long** on a newly confirmed **LL**, filled at the confirming candle's close. Exit at **+3% take-profit** (checked against the candle high; fill at the TP price) or a newly confirmed swing high, whichever comes first. If the trade is in profit or flat at that close, **HH or LH** exits; if it is in a loss, only an **HH** exits and an LH is ignored.
-- **Short** is the opposite: enter on a confirmed **HH**, take-profit at **−3%** on the candle low, and exit on a confirmed swing low (**LL or HL**) when in profit or flat. In a loss, only an **LL** exits and an HL is ignored.
-- **No stop-loss.** One position per coin. If an opposite entry confirms on the same candle as an exit, the bot closes and then reverses.
-- Starting balance **10,000 USDT**, fixed **1,000 USDT** notional per trade, **0.04%** fee per side. These defaults live in `python/bot.py` (`DEFAULT_CONFIG`) and are stored in `data/paper_state.json`.
+- **Long** on a newly confirmed **LL**, filled at the confirming candle's close, only if Wilder **RSI(14)** at that close is **below 32**. Exit at **+3% take-profit** (checked against the candle high; fill at the TP price) or a newly confirmed **HH**, whichever comes first. **LH** is ignored at all times.
+- **Short** is the opposite: enter on a confirmed **HH** only if RSI(14) is **above 68**, take-profit at **−3%** on the candle low, and exit only on a confirmed **LL**. **HL** is ignored at all times.
+- **No stop-loss.** One position per coin. If an opposite entry confirms on the same candle as an exit, the bot closes first and opens the reverse only if RSI also confirms that entry.
+- Starting balance **200 USDT**, fixed **200 USDT** notional per trade at 1x, **0.04%** fee per side. These defaults live in `python/bot.py` (`DEFAULT_CONFIG`) and are stored in `data/paper_state.json`.
 
 The live book starts flat from the first run (no backfilled trades). State is committed back to [`data/paper_state.json`](data/paper_state.json). A one-shot historical simulation of the last ~1000 candles is stored separately in [`data/backtest.json`](data/backtest.json) and is not mixed into the live book.
 

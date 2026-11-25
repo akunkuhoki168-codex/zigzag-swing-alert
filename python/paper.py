@@ -7,14 +7,14 @@ import time
 from pathlib import Path
 from typing import Any
 
-STARTING_BALANCE = 10_000.0
+STARTING_BALANCE = 200.0
 TAKER_FEE = 0.0004
 MAX_TRADES = 200
 DEFAULTS = {
     "sl_pct": 1.5,
     "tp_pct": 3.0,
-    "leverage": 5,
-    "margin": 100.0,
+    "leverage": 1,
+    "margin": 200.0,
     "shorts": True,
     "structure_filter": False,
     "reversal_pct": 1.5,
