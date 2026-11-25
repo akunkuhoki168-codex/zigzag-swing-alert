@@ -65,7 +65,6 @@
     leverage: document.getElementById("leverage"),
     margin: document.getElementById("margin"),
     shorts: document.getElementById("shorts"),
-    structureFilter: document.getElementById("structureFilter"),
     flattenBtn: document.getElementById("flattenBtn"),
     resetBtn: document.getElementById("resetBtn"),
     botStatus: document.getElementById("botStatus"),
@@ -78,12 +77,11 @@
     botTrades: document.getElementById("botTrades"),
   };
 
-  var BOT_STATE_URLS = [
-    "https://raw.githubusercontent.com/dedkovic441-hub/zigzag-swing-alert/main/data/paper_state.json",
-    "data/paper_state.json"
-  ];
+  var BOT_STATE_URLS = ["data/paper_state.json"];
   var botState = null;
   var botTpLine = null;
+  var ENGINE_TF = "15m";
+  var engineTimer = null;
 
 
   function logEngine(msg, kind) {
@@ -178,7 +176,6 @@
       leverage: el.leverage.value,
       margin: el.margin.value,
       shorts: el.shorts.checked,
-      structureFilter: el.structureFilter.checked,
       reversalPct: el.reversalPct.value,
     });
     el.reversalPct.value = String(paper.params.reversalPct);
@@ -195,7 +192,6 @@
     el.leverage.value = p.leverage;
     el.margin.value = p.margin;
     el.shorts.checked = p.shorts;
-    el.structureFilter.checked = p.structureFilter;
   }
 
   function setEngineButton() {
@@ -276,14 +272,18 @@
     if (slLine) { try { slLine.remove(); } catch (e) {} slLine = null; }
     if (tpLine) { try { tpLine.remove(); } catch (e) {} tpLine = null; }
     if (!pos || !candleSeries) return;
-    slLine = candleSeries.createPriceLine({
-      price: pos.sl, color: "#f6465d", lineWidth: 1,
-      lineStyle: LC.LineStyle.Dashed, axisLabelVisible: true, title: "SL",
-    });
+    if (pos.sl != null) {
+      slLine = candleSeries.createPriceLine({
+        price: pos.sl, color: "#f6465d", lineWidth: 1,
+        lineStyle: LC.LineStyle.Dashed, axisLabelVisible: true, title: "SL",
+      });
+    }
+    if (pos.tp != null) {
     tpLine = candleSeries.createPriceLine({
       price: pos.tp, color: "#0ecb81", lineWidth: 1,
       lineStyle: LC.LineStyle.Dashed, axisLabelVisible: true, title: "TP",
     });
+    }
   }
 
 
@@ -575,30 +575,100 @@
     el.signals.innerHTML = html;
   }
 
+  function priceMap() {
+    var map = {};
+    var src = paper.lastPrices || {};
+    Object.keys(src).forEach(function (sym) { map[sym] = src[sym]; });
+    if (markPrice != null) map[symbol] = markPrice;
+    return map;
+  }
+
+  function logPaperEvents(events) {
+    (events || []).forEach(function (ev) {
+      if (ev.type === "close") {
+        var tr = ev.trade;
+        logEngine("Closed " + tr.side + " " + Z.shortName(tr.symbol) + " · " + tr.exitReason + " · PnL " + fmtPrice(tr.pnl, 2), tr.pnl >= 0 ? "OK" : "ERR");
+      } else if (ev.type === "open" || ev.type === "reverse") {
+        var pos = ev.position;
+        var tag = ev.type === "reverse" ? "Reversed into " : "Opened ";
+        logEngine(tag + pos.side + " " + Z.shortName(pos.symbol) + " @ " + fmtPrice(pos.entry) + " · " + (pos.reason || "") + " · " + (pos.tf || ENGINE_TF), "OK");
+      }
+    });
+  }
+
+  function walkClosed(sym, closedRows) {
+    var candles = Z.rowsToCandles(closedRows);
+    var zz = Z.compute(candles, paper.params.reversalPct);
+    var events = P.walkSymbol(paper, sym, candles, zz.pivots, ENGINE_TF);
+    if (events.length) {
+      logPaperEvents(events);
+      P.save(paper);
+    } else {
+      P.save(paper);
+    }
+    return events;
+  }
+
+  async function tickEngineCoins() {
+    if (!paper.engineOn) return;
+    var i, sym, rows, closedRows;
+    for (i = 0; i < Z.COINS.length; i++) {
+      sym = Z.COINS[i];
+      try {
+        if (sym === symbol && tf === ENGINE_TF && klines.length) rows = klines;
+        else rows = await fetchKlines(sym, ENGINE_TF);
+      } catch (e) {
+        logEngine("Could not refresh " + Z.shortName(sym) + " 15m for the sandbox.", "WARN");
+        continue;
+      }
+      closedRows = Z.closedKlines(rows, true);
+      walkClosed(sym, closedRows);
+    }
+  }
+
+  function startEngineTimer() {
+    stopEngineTimer();
+    tickEngineCoins();
+    engineTimer = setInterval(function () {
+      if (paper.engineOn) tickEngineCoins();
+    }, 60000);
+  }
+
+  function stopEngineTimer() {
+    if (engineTimer) {
+      clearInterval(engineTimer);
+      engineTimer = null;
+    }
+  }
+
   function renderLedger(dec) {
-    var pos = paper.position;
-    var px = markPrice;
-    var eq = P.equity(paper, px);
+    var opens = P.openPositions(paper);
+    var pxMap = priceMap();
+    var eq = P.equity(paper, pxMap);
     el.equity.textContent = fmtPrice(eq, 2) + " USDT";
     el.equity.className = "val " + (eq >= P.STARTING_BALANCE ? "up" : "down");
-    updateLevelLines(pos && pos.symbol === symbol ? pos : null);
+    var visible = null;
+    opens.forEach(function (p) { if (p.symbol === symbol) visible = p; });
+    updateLevelLines(visible);
 
-    if (!paper.trades.length && !pos) {
-      el.ledger.innerHTML = '<div class="empty">No paper trades yet. Start the engine to simulate entries on confirmed ZigZag pivots.</div>';
+    if (!paper.trades.length && !opens.length) {
+      el.ledger.innerHTML = '<div class="empty">No paper trades yet. Start the sandbox to simulate the bot rules on confirmed LL / HH pivots.</div>';
       return;
     }
     var html = '<div class="tr-head"><div>Time</div><div>Side</div><div>Symbol</div><div>Exit</div><div>PnL</div></div>';
-    if (pos) {
+    opens.forEach(function (pos) {
+      var px = pxMap[pos.symbol];
       var u = P.unrealized(pos, px);
+      var slTxt = pos.sl != null ? "SL " + fmtPrice(pos.sl, dec) : "SL off";
       html += '<div class="tr-row">' +
-        '<div class="when">OPEN<small>' + Z.shortName(pos.symbol) + " " + pos.tf + "</small></div>" +
+        '<div class="when">OPEN<small>' + Z.shortName(pos.symbol) + " " + (pos.tf || ENGINE_TF) + "</small></div>" +
         '<div><span class="pill ' + pos.side + '">' + pos.side + "</span></div>" +
         '<div class="hide-sm">' + fmtPrice(pos.entry, dec) + " → " + fmtPrice(px, dec) + "</div>" +
-        '<div class="hide-sm">SL ' + fmtPrice(pos.sl, dec) + "</div>" +
+        '<div class="hide-sm">' + slTxt + "</div>" +
         '<div class="pnl ' + (u >= 0 ? "pos" : "neg") + '">' + (u >= 0 ? "+" : "") + fmtPrice(u, 2) + "</div>" +
         '<div class="meta">Entry ' + fmtPrice(pos.entry, dec) + " · uPnL " + fmtPrice(u, 2) + "</div>" +
       "</div>";
-    }
+    });
     html += paper.trades.map(function (tr) {
       var w = Z.formatWib(tr.closedAt);
       var pnl = tr.pnl;
@@ -615,62 +685,15 @@
   }
 
   function onMarketUpdate(closedRows, zz, lastPx, dec) {
-    var lastBar = closedRows.length ? closedRows[closedRows.length - 1] : null;
-    var forming = klines.length ? toCandle(klines[klines.length - 1]) : null;
-
-    if (paper.position) {
-      var sameSymbol = paper.position.symbol === symbol;
-      var closed = P.manage(paper, lastPx, sameSymbol ? forming : null);
-      if (closed && closed.ok) {
-        logEngine("Closed " + closed.trade.side + " " + Z.shortName(closed.trade.symbol) + " · " + closed.trade.exitReason + " · PnL " + fmtPrice(closed.trade.pnl, 2), closed.trade.pnl >= 0 ? "OK" : "ERR");
-      }
-    }
-
-    if (paper.engineOn) {
+    if (paper.engineOn && tf === ENGINE_TF && Z.COINS.indexOf(symbol) !== -1) {
+      var lastBar = closedRows.length ? closedRows[closedRows.length - 1] : null;
       var closedOpen = lastBar ? Number(lastBar[0]) : null;
       if (closedOpen && closedOpen !== lastClosedOpen) {
         lastClosedOpen = closedOpen;
-        maybeEnter(closedRows, zz, lastPx);
+        walkClosed(symbol, closedRows);
       }
     }
-
     renderLedger(dec);
-  }
-
-  function maybeEnter(closedRows, zz, lastPx) {
-    if (!zz.pivots.length) return;
-    var pivot = zz.pivots[zz.pivots.length - 1];
-    var key = Z.pivotKey(symbol, tf, pivot);
-    if (key === paper.lastPivotKey) return;
-    paper.lastPivotKey = key;
-    P.save(paper);
-
-    var sig = Z.signalForPivot(pivot);
-    if (!sig || paper.position) return;
-
-    var params = paper.params;
-    if (sig.side === "SHORT" && !params.shorts) {
-      logEngine("Skip short on " + Z.shortName(symbol) + " — shorts disabled.", "WARN");
-      return;
-    }
-    if (params.structureFilter && !Z.structureAllows(pivot, params.shorts)) {
-      logEngine("Skip " + sig.side + " — structure filter wants HL for longs and LH for shorts (got " + (pivot.label || pivot.type) + ").", "WARN");
-      return;
-    }
-    var lastClosed = closedRows[closedRows.length - 1];
-    var price = lastClosed ? Number(lastClosed[4]) : lastPx;
-    var opened = P.openPosition(paper, {
-      symbol: symbol,
-      tf: tf,
-      side: sig.side,
-      price: price,
-      reason: "ZigZag " + (pivot.label || pivot.type),
-    });
-    if (!opened.ok) {
-      logEngine("Did not open " + sig.side + ": " + opened.reason, "WARN");
-      return;
-    }
-    logEngine("Opened " + sig.side + " " + Z.shortName(symbol) + " @ " + fmtPrice(price) + " · " + (pivot.label || pivot.type) + " · " + tf, "OK");
   }
 
   function upsertKline(row) {
@@ -822,7 +845,7 @@
   function buildSwitcher() {
     var select = el.coinSelect;
     select.innerHTML = "";
-    Z.ALL_COINS.forEach(function (sym) { addOption(select, sym); });
+    Z.COINS.forEach(function (sym) { addOption(select, sym); });
     select.value = symbol;
     select.addEventListener("change", function () {
       var sym = select.value;
@@ -848,20 +871,24 @@
     if (paper.engineOn) {
       var closed = Z.closedKlines(klines, true);
       lastClosedOpen = closed.length ? Number(closed[closed.length - 1][0]) : null;
-      logEngine("Local sandbox ON · " + Z.shortName(symbol) + " " + tf + " · reversal " + paper.params.reversalPct + "% · " + paper.params.leverage + "x. This tab only, not the 24/7 bot.", "WARN");
+      logEngine("Local sandbox ON · ZigZag Paper Bot rules · 15m · reversal " + paper.params.reversalPct + "% · notional " + P.notionalOf(paper.params) + " USDT · SL " + (paper.params.slPct > 0 ? paper.params.slPct + "%" : "off") + ". This tab only, not the 24/7 book.", "WARN");
+      startEngineTimer();
     } else {
-      logEngine("Paper engine OFF. Open simulated positions stay until you flatten or they hit SL/TP.", "WARN");
+      stopEngineTimer();
+      logEngine("Sandbox OFF. Open simulated positions stay until you flatten or they hit TP or HH/LL.", "WARN");
     }
   }
 
   function flatten() {
-    if (!paper.position) {
+    var opens = P.openPositions(paper);
+    if (!opens.length) {
       logEngine("No open paper position to flatten.", "WARN");
       return;
     }
-    var px = markPrice || (klines.length ? Number(klines[klines.length - 1][4]) : null);
-    var closed = P.closePosition(paper, { price: px, reason: "Manual flatten" });
-    if (closed.ok) logEngine("Flattened " + closed.trade.side + " " + Z.shortName(closed.trade.symbol) + " · PnL " + fmtPrice(closed.trade.pnl, 2), closed.trade.pnl >= 0 ? "OK" : "ERR");
+    var results = P.flattenAll(paper, priceMap());
+    results.forEach(function (closed) {
+      if (closed.ok) logEngine("Flattened " + closed.trade.side + " " + Z.shortName(closed.trade.symbol) + " · PnL " + fmtPrice(closed.trade.pnl, 2), closed.trade.pnl >= 0 ? "OK" : "ERR");
+    });
     renderLedger();
   }
 
@@ -879,7 +906,7 @@
     renderLedger();
   }
 
-  ["reversalPct", "slPct", "tpPct", "leverage", "margin", "shorts", "structureFilter"].forEach(function (id) {
+  ["reversalPct", "slPct", "tpPct", "leverage", "margin", "shorts"].forEach(function (id) {
     var node = el[id];
     var ev = id === "reversalPct" ? "input" : "change";
     node.addEventListener(ev, function () {
@@ -904,7 +931,7 @@
   setEngineButton();
   buildSwitcher();
   buildChart();
-  logEngine("ZigZag Swing Alert ready. The 24/7 paper bot runs on GitHub Actions even when this tab is closed. Local sandbox is this browser only. No API keys, no live orders.", "OK");
+  logEngine("ZigZag Paper Bot ready. The official 24/7 book runs on this box even when this tab is closed. The local sandbox is this browser only. No API keys, no live orders.", "OK");
   fetchBotState().then(function () {
     if (klines.length) render(klines, true);
   });

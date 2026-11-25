@@ -6,16 +6,13 @@ Rules (bar-close confirmed ZigZag, default 1.5% reversal, 15m closed candles):
   LONG  entry: newly confirmed pivot labelled LL, filled at the confirming
                candle's close.
   LONG  exit:  take-profit (default +3% from entry, checked against candle
-               highs; fill at the TP price) or a newly confirmed swing HIGH,
-               whichever comes first. There is no stop-loss.
-               If the trade is in profit or flat at that confirming close,
-               exit on either HH or LH. If it is in a loss, ignore an LH
-               and exit only on an HH.
+               highs; fill at the TP price) or a newly confirmed HH,
+               whichever comes first. LH is ignored at all times. There is
+               no stop-loss.
 
   SHORT is the mirror: enter on a confirmed HH, take-profit at -3% (checked
-               against candle lows). Exit on a confirmed swing LOW (LL or
-               HL) when in profit or flat. When in a loss, ignore an HL
-               and exit only on an LL.
+               against candle lows). Exit on a confirmed LL. HL is ignored
+               at all times.
 
   One position per coin. No new entry while a position is open, except:
   if an opposite entry signal confirms on the same candle as an exit
@@ -135,11 +132,11 @@ def empty_state(config: dict | None = None) -> dict[str, Any]:
         "no_stop_loss": True,
         "rules": (
             "Long on confirmed LL, exit at +TP% (on candle high) or a confirmed "
-            "swing high, whichever comes first. In profit/flat, HH or LH exits; "
-            "in a loss, only HH (LH is ignored). Short is the mirror: enter on "
-            "HH, TP on candle low, exit on LL/HL in profit/flat, only LL in a loss. "
-            "No stop-loss. One position per coin. Reverse if an opposite entry "
-            "confirms on the same candle as an exit."
+            "HH, whichever comes first. LH is ignored at all times. Short is the "
+            "mirror: enter on HH, TP on candle low, exit only on a confirmed LL. "
+            "HL is ignored at all times. No stop-loss. One position per coin. "
+            "Reverse if an opposite entry confirms on the same candle as an exit "
+            "(HH closes a long and opens a short; LL is the mirror)."
         ),
         "config": cfg,
         "data_source": None,
@@ -251,16 +248,13 @@ def entry_side(pivot: dict | None) -> str | None:
 
 
 def structure_exit_reason(side: str, entry: float, close: float, pivot: dict) -> str | None:
+    """Structure exits: long only on HH, short only on LL. LH and HL are ignored."""
     label = pivot.get("label") or ""
-    if side == "long" and pivot.get("type") == "HIGH" and label in ("HH", "LH"):
-        if is_profit_or_flat(side, entry, close) or label == "HH":
-            return label
-        return None  # losing long: ignore LH
-    if side == "short" and pivot.get("type") == "LOW" and label in ("LL", "HL"):
-        if is_profit_or_flat(side, entry, close) or label == "LL":
-            return label
-        return None  # losing short: ignore HL
-    return None
+    if side == "long" and pivot.get("type") == "HIGH" and label == "HH":
+        return "HH"
+    if side == "short" and pivot.get("type") == "LOW" and label == "LL":
+        return "LL"
+    return None  # LH and HL ignored at all times
 
 
 def tp_hit(pos: dict, bar: dict) -> bool:

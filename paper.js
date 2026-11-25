@@ -1,22 +1,24 @@
-/* Browser-only simulated futures wallet. Never places real orders. */
+/* Browser-only simulated futures wallet. Never places real orders.
+   Rules match ZigZag Paper Bot: long on LL, exit +TP or HH (LH ignored);
+   short on HH, exit +TP or LL (HL ignored). No stop-loss by default. */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
   else root.PaperWallet = factory();
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var STORAGE_KEY = "zigzag-swing-alert-paper-v1";
-  var LEGACY_STORAGE_KEY = "adx-alert-paper-v1";
+  var STORAGE_KEY = "zigzag-paper-bot-v1";
+  var LEGACY_STORAGE_KEYS = ["zigzag-swing-alert-paper-v1", "adx-alert-paper-v1"];
   var STARTING_BALANCE = 10000;
   var TAKER_FEE = 0.0004;
   var MAX_TRADES = 200;
+  var BOT_COINS = ["NEARUSDT", "INJUSDT", "RENDERUSDT", "FETUSDT", "ARBUSDT"];
   var DEFAULTS = {
-    slPct: 1.5,
+    slPct: 0,
     tpPct: 3,
-    leverage: 5,
-    margin: 100,
+    leverage: 1,
+    margin: 1000,
     shorts: true,
-    structureFilter: false,
     reversalPct: 1.5,
   };
 
@@ -29,6 +31,16 @@
     return Math.round(x * p) / p;
   }
 
+  function notionalOf(params) {
+    return params.margin * params.leverage;
+  }
+
+  function emptyPositions() {
+    var pos = {};
+    BOT_COINS.forEach(function (c) { pos[c] = null; });
+    return pos;
+  }
+
   function clampParams(raw) {
     raw = raw || {};
     var leverage = Math.round(Number(raw.leverage));
@@ -38,8 +50,8 @@
     if (!isFinite(margin)) margin = DEFAULTS.margin;
     margin = Math.min(10000, Math.max(1, margin));
     var slPct = Number(raw.slPct);
-    if (!isFinite(slPct)) slPct = DEFAULTS.slPct;
-    slPct = Math.min(50, Math.max(0.1, slPct));
+    if (!isFinite(slPct) || slPct < 0) slPct = DEFAULTS.slPct;
+    slPct = Math.min(50, Math.max(0, slPct));
     var tpPct = Number(raw.tpPct);
     if (!isFinite(tpPct)) tpPct = DEFAULTS.tpPct;
     tpPct = Math.min(100, Math.max(0.1, tpPct));
@@ -52,7 +64,6 @@
       leverage: leverage,
       margin: margin,
       shorts: raw.shorts !== false,
-      structureFilter: !!raw.structureFilter,
       reversalPct: reversalPct,
     };
   }
@@ -60,27 +71,40 @@
   function emptyState() {
     return {
       balance: STARTING_BALANCE,
-      position: null,
+      positions: emptyPositions(),
       trades: [],
       params: clampParams(DEFAULTS),
       engineOn: false,
-      lastPivotKey: "",
+      lastProcessed: {},
+      lastPrices: {},
+      nextTradeId: 1,
     };
+  }
+
+  function normalizeLoaded(parsed) {
+    var s = emptyState();
+    if (typeof parsed.balance === "number" && isFinite(parsed.balance)) s.balance = parsed.balance;
+    if (Array.isArray(parsed.trades)) s.trades = parsed.trades.slice(0, MAX_TRADES);
+    s.params = clampParams(parsed.params || DEFAULTS);
+    s.engineOn = false;
+    s.lastProcessed = parsed.lastProcessed && typeof parsed.lastProcessed === "object" ? parsed.lastProcessed : {};
+    s.lastPrices = parsed.lastPrices && typeof parsed.lastPrices === "object" ? parsed.lastPrices : {};
+    s.nextTradeId = parsed.nextTradeId || (s.trades.length + 1);
+    if (parsed.positions && typeof parsed.positions === "object" && !parsed.position) {
+      Object.keys(parsed.positions).forEach(function (sym) {
+        s.positions[sym] = parsed.positions[sym] || null;
+      });
+    } else if (parsed.position && parsed.position.symbol) {
+      s.positions[parsed.position.symbol] = parsed.position;
+    }
+    return s;
   }
 
   function load() {
     try {
-      var raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+      var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return emptyState();
-      var parsed = JSON.parse(raw);
-      var s = emptyState();
-      if (typeof parsed.balance === "number" && isFinite(parsed.balance)) s.balance = parsed.balance;
-      if (parsed.position && parsed.position.symbol) s.position = parsed.position;
-      if (Array.isArray(parsed.trades)) s.trades = parsed.trades.slice(0, MAX_TRADES);
-      s.params = clampParams(parsed.params || DEFAULTS);
-      s.engineOn = false;
-      s.lastPivotKey = parsed.lastPivotKey || "";
-      return s;
+      return normalizeLoaded(JSON.parse(raw));
     } catch (e) {
       return emptyState();
     }
@@ -90,10 +114,12 @@
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         balance: state.balance,
-        position: state.position,
+        positions: state.positions,
         trades: state.trades,
         params: state.params,
-        lastPivotKey: state.lastPivotKey,
+        lastProcessed: state.lastProcessed,
+        lastPrices: state.lastPrices,
+        nextTradeId: state.nextTradeId,
       }));
     } catch (e) { /* ignore quota / private mode */ }
   }
@@ -106,81 +132,118 @@
     return next;
   }
 
-  function unrealized(position, price) {
-    if (!position || !price) return 0;
-    var dir = position.side === "SHORT" ? -1 : 1;
-    return (price - position.entry) * position.qty * dir;
-  }
-
-  function equity(state, price) {
-    return state.balance + unrealized(state.position, price);
-  }
-
   function feeFor(notional) {
     return notional * TAKER_FEE;
   }
 
+  function positionPnl(pos, price) {
+    if (!pos || !price) return 0;
+    var dir = pos.side === "SHORT" ? -1 : 1;
+    var gross = (price - pos.entry) * pos.qty * dir;
+    var exitFee = feeFor(pos.qty * price);
+    return gross - (pos.feeOpen || 0) - exitFee;
+  }
+
+  function unrealized(position, price) {
+    return positionPnl(position, price);
+  }
+
+  function openPositions(state) {
+    var list = [];
+    var positions = (state && state.positions) || {};
+    Object.keys(positions).forEach(function (sym) {
+      if (positions[sym]) list.push(positions[sym]);
+    });
+    return list;
+  }
+
+  function equity(state, priceMap) {
+    var eq = state.balance;
+    openPositions(state).forEach(function (pos) {
+      var px = priceMap && priceMap[pos.symbol] != null ? priceMap[pos.symbol] : null;
+      if (px == null && state.lastPrices) px = state.lastPrices[pos.symbol];
+      eq += unrealized(pos, px);
+    });
+    return eq;
+  }
+
   function slTpPrices(side, entry, slPct, tpPct) {
-    var sl = slPct / 100;
     var tp = tpPct / 100;
+    var sl = slPct > 0 ? slPct / 100 : 0;
     if (side === "SHORT") {
-      return { sl: entry * (1 + sl), tp: entry * (1 - tp) };
+      return { sl: sl > 0 ? entry * (1 + sl) : null, tp: entry * (1 - tp) };
     }
-    return { sl: entry * (1 - sl), tp: entry * (1 + tp) };
+    return { sl: sl > 0 ? entry * (1 - sl) : null, tp: entry * (1 + tp) };
   }
 
-  function pivotKey(symbol, tf, pivot) {
-    return symbol + "|" + tf + "|" + pivot.type + "|" + pivot.time;
-  }
-
-  function canOpen(state, side, params) {
-    if (state.position) return "Already in a paper position.";
-    if (side === "SHORT" && !params.shorts) return "Shorts are disabled.";
-    if (state.balance < params.margin) return "Not enough paper balance for margin.";
+  function entrySide(pivot) {
+    if (!pivot) return null;
+    if (pivot.label === "LL" && pivot.type === "LOW") return "LONG";
+    if (pivot.label === "HH" && pivot.type === "HIGH") return "SHORT";
     return null;
+  }
+
+  function structureExitReason(side, pivot) {
+    var label = (pivot && pivot.label) || "";
+    if (side === "LONG" && pivot.type === "HIGH" && label === "HH") return "HH";
+    if (side === "SHORT" && pivot.type === "LOW" && label === "LL") return "LL";
+    return null;
+  }
+
+  function tpHit(pos, bar) {
+    if (pos.side === "LONG") return bar.high >= pos.tp;
+    return bar.low <= pos.tp;
+  }
+
+  function slHit(pos, bar) {
+    if (pos.sl == null) return false;
+    if (pos.side === "LONG") return bar.low <= pos.sl;
+    return bar.high >= pos.sl;
   }
 
   function openPosition(state, opts) {
     var params = state.params;
-    var block = canOpen(state, opts.side, params);
-    if (block) return { ok: false, reason: block };
+    var symbol = opts.symbol;
+    if (state.positions[symbol]) return { ok: false, reason: "Already in a paper position on " + symbol + "." };
+    if (opts.side === "SHORT" && !params.shorts) return { ok: false, reason: "Shorts are disabled." };
     var entry = Number(opts.price);
     if (!entry || entry <= 0) return { ok: false, reason: "No entry price." };
-    var notional = params.margin * params.leverage;
+    var notional = notionalOf(params);
     var qty = notional / entry;
     var fee = feeFor(notional);
-    if (state.balance < params.margin + fee) return { ok: false, reason: "Balance cannot cover margin and fee." };
     var levels = slTpPrices(opts.side, entry, params.slPct, params.tpPct);
-    state.balance -= params.margin + fee;
-    state.position = {
-      id: "p" + nowMs(),
-      symbol: opts.symbol,
-      tf: opts.tf,
+    var pos = {
+      id: "p" + (state.nextTradeId++),
+      symbol: symbol,
+      tf: opts.tf || "15m",
       side: opts.side,
       entry: entry,
       qty: qty,
+      notional: notional,
       margin: params.margin,
       leverage: params.leverage,
       sl: levels.sl,
       tp: levels.tp,
       feeOpen: fee,
       openedAt: nowMs(),
+      entryTime: opts.bar && opts.bar.time != null ? opts.bar.time : null,
       reason: opts.reason || "ZigZag",
     };
+    if (!state.positions) state.positions = emptyPositions();
+    state.positions[symbol] = pos;
     save(state);
-    return { ok: true, position: state.position };
+    return { ok: true, position: pos };
   }
 
   function closePosition(state, opts) {
-    var pos = state.position;
+    var symbol = opts.symbol;
+    if (!symbol && opts.position) symbol = opts.position.symbol;
+    var pos = symbol ? (state.positions || {})[symbol] : null;
     if (!pos) return { ok: false, reason: "No open position." };
     var exit = Number(opts.price);
     if (!exit || exit <= 0) return { ok: false, reason: "No exit price." };
-    var pnl = unrealized(pos, exit);
-    var notional = pos.qty * exit;
-    var fee = feeFor(notional);
-    var returned = pos.margin + pnl - fee;
-    state.balance += returned;
+    var pnl = positionPnl(pos, exit);
+    state.balance = round(state.balance + pnl, 8);
     var trade = {
       id: pos.id,
       symbol: pos.symbol,
@@ -189,9 +252,10 @@
       entry: pos.entry,
       exit: exit,
       qty: pos.qty,
+      notional: pos.notional,
       margin: pos.margin,
       leverage: pos.leverage,
-      pnl: round(pnl - fee - pos.feeOpen, 4),
+      pnl: round(pnl, 4),
       reason: pos.reason,
       exitReason: opts.reason || "Close",
       openedAt: pos.openedAt,
@@ -199,44 +263,124 @@
     };
     state.trades.unshift(trade);
     if (state.trades.length > MAX_TRADES) state.trades.length = MAX_TRADES;
-    state.position = null;
+    state.positions[symbol] = null;
     save(state);
     return { ok: true, trade: trade };
   }
 
+  function flattenAll(state, priceMap) {
+    var results = [];
+    openPositions(state).forEach(function (pos) {
+      var px = priceMap && priceMap[pos.symbol] != null ? priceMap[pos.symbol] : pos.entry;
+      var closed = closePosition(state, { symbol: pos.symbol, price: px, reason: "Manual flatten" });
+      if (closed.ok) results.push(closed);
+    });
+    return results;
+  }
+
   /**
-   * Check SL, TP, or isolated liquidation against a price or a closed/forming bar.
-   * If a bar is given, a wick through the level exits. If both SL and TP trade in
-   * the same bar, the stop is taken (conservative).
+   * Apply TP, optional SL, then structure exits, then entries, on one closed candle.
+   * SL (if enabled) is taken first when both SL and TP trade in the same bar.
+   * A position opened on this bar is not checked for TP or structure on the same bar.
+   * After an exit, only an opposite-side entry on this same candle is taken.
    */
-  function manage(state, price, bar) {
-    var pos = state.position;
-    if (!pos) return null;
-    var high = bar ? Number(bar.high) : price;
-    var low = bar ? Number(bar.low) : price;
-    var last = price != null ? price : (bar ? Number(bar.close) : null);
-    if (last == null) return null;
+  function processBar(state, symbol, bar, confirmed, tf) {
+    var events = [];
+    var params = state.params;
+    var position = (state.positions || {})[symbol] || null;
+    var exitSide = null;
 
-    var liqMove = 1 / pos.leverage;
-    var liq = pos.side === "SHORT" ? pos.entry * (1 + liqMove * 0.9) : pos.entry * (1 - liqMove * 0.9);
-
-    if (pos.side === "LONG") {
-      if (low <= liq) return closePosition(state, { price: liq, reason: "Liquidation" });
-      if (low <= pos.sl) return closePosition(state, { price: pos.sl, reason: "Stop loss" });
-      if (high >= pos.tp) return closePosition(state, { price: pos.tp, reason: "Take profit" });
-    } else {
-      if (high >= liq) return closePosition(state, { price: liq, reason: "Liquidation" });
-      if (high >= pos.sl) return closePosition(state, { price: pos.sl, reason: "Stop loss" });
-      if (low <= pos.tp) return closePosition(state, { price: pos.tp, reason: "Take profit" });
+    if (position) {
+      if (slHit(position, bar)) {
+        var slClose = closePosition(state, { symbol: symbol, price: position.sl, reason: "Stop loss" });
+        if (slClose.ok) {
+          events.push({ type: "close", trade: slClose.trade });
+          exitSide = slClose.trade.side;
+          position = null;
+        }
+      } else if (tpHit(position, bar)) {
+        var tpClose = closePosition(state, { symbol: symbol, price: position.tp, reason: "TP" });
+        if (tpClose.ok) {
+          events.push({ type: "close", trade: tpClose.trade });
+          exitSide = tpClose.trade.side;
+          position = null;
+        }
+      } else {
+        var i;
+        for (i = 0; i < (confirmed || []).length; i++) {
+          var reason = structureExitReason(position.side, confirmed[i]);
+          if (!reason) continue;
+          var stClose = closePosition(state, { symbol: symbol, price: bar.close, reason: reason });
+          if (stClose.ok) {
+            events.push({ type: "close", trade: stClose.trade });
+            exitSide = stClose.trade.side;
+            position = null;
+          }
+          break;
+        }
+      }
     }
-    return null;
+
+    if (!((state.positions || {})[symbol])) {
+      var j;
+      for (j = 0; j < (confirmed || []).length; j++) {
+        var pivot = confirmed[j];
+        var side = entrySide(pivot);
+        if (!side) continue;
+        if (exitSide && side === exitSide) continue;
+        var opened = openPosition(state, {
+          symbol: symbol,
+          tf: tf || "15m",
+          side: side,
+          price: bar.close,
+          bar: bar,
+          reason: "ZigZag " + (pivot.label || pivot.type),
+        });
+        if (opened.ok) {
+          events.push({ type: exitSide && side !== exitSide ? "reverse" : "open", position: opened.position, pivot: pivot });
+        }
+        break;
+      }
+    }
+    return events;
+  }
+
+  function walkSymbol(state, symbol, candles, pivots, tf) {
+    var events = [];
+    if (!candles || !candles.length) return events;
+    var byConfirm = {};
+    (pivots || []).forEach(function (p) {
+      var t = p.confirmTime;
+      if (t == null) return;
+      if (!byConfirm[t]) byConfirm[t] = [];
+      byConfirm[t].push(p);
+    });
+    if (!state.lastProcessed) state.lastProcessed = {};
+    if (!state.lastPrices) state.lastPrices = {};
+    var startAfter = state.lastProcessed[symbol];
+    if (startAfter == null) {
+      state.lastProcessed[symbol] = candles[candles.length - 1].time;
+      state.lastPrices[symbol] = candles[candles.length - 1].close;
+      return events;
+    }
+    var i;
+    for (i = 0; i < candles.length; i++) {
+      var bar = candles[i];
+      if (bar.time <= startAfter) continue;
+      events = events.concat(processBar(state, symbol, bar, byConfirm[bar.time] || [], tf));
+      state.lastProcessed[symbol] = bar.time;
+      state.lastPrices[symbol] = bar.close;
+    }
+    return events;
   }
 
   return {
     STORAGE_KEY: STORAGE_KEY,
+    LEGACY_STORAGE_KEYS: LEGACY_STORAGE_KEYS,
     STARTING_BALANCE: STARTING_BALANCE,
     TAKER_FEE: TAKER_FEE,
     DEFAULTS: DEFAULTS,
+    BOT_COINS: BOT_COINS,
     clampParams: clampParams,
     emptyState: emptyState,
     load: load,
@@ -245,11 +389,15 @@
     unrealized: unrealized,
     equity: equity,
     slTpPrices: slTpPrices,
-    pivotKey: pivotKey,
-    canOpen: canOpen,
+    notionalOf: notionalOf,
+    entrySide: entrySide,
+    structureExitReason: structureExitReason,
+    openPositions: openPositions,
     openPosition: openPosition,
     closePosition: closePosition,
-    manage: manage,
+    flattenAll: flattenAll,
+    processBar: processBar,
+    walkSymbol: walkSymbol,
     round: round,
   };
 });

@@ -24,8 +24,8 @@
   })();
   var TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"];
   var TF = "15m";
-  var TF_STORAGE_KEY = "zigzag-swing-alert-tf";
-  var TF_STORAGE_KEY_LEGACY = "adx-alert-tf";
+  var TF_STORAGE_KEY = "zigzag-paper-bot-tf";
+  var TF_STORAGE_KEY_LEGACY = "zigzag-swing-alert-tf";
 
   function clampReversal(pct) {
     var n = Number(pct);
@@ -218,19 +218,24 @@
     return { label: "Building…", kind: "" };
   }
 
-  /* A newly confirmed pivot is a signal. Long on confirmed LOW, short on confirmed HIGH. */
+  /* Entry signals match ZigZag Paper Bot: long on confirmed LL, short on confirmed HH. */
   function signalForPivot(pivot) {
     if (!pivot) return null;
-    if (pivot.type === "LOW") return { side: "LONG", signal: "long", pivot: pivot };
-    if (pivot.type === "HIGH") return { side: "SHORT", signal: "short", pivot: pivot };
+    if (pivot.label === "LL" && pivot.type === "LOW") return { side: "LONG", signal: "long", pivot: pivot };
+    if (pivot.label === "HH" && pivot.type === "HIGH") return { side: "SHORT", signal: "short", pivot: pivot };
     return null;
   }
 
-  function structureAllows(pivot, shortsEnabled) {
-    if (!pivot) return false;
-    if (pivot.type === "LOW") return pivot.label === "HL";
-    if (pivot.type === "HIGH") return shortsEnabled && pivot.label === "LH";
-    return false;
+  function entrySide(pivot) {
+    var sig = signalForPivot(pivot);
+    return sig ? sig.side : null;
+  }
+
+  function structureExitReason(side, pivot) {
+    var label = (pivot && pivot.label) || "";
+    if (side === "LONG" && pivot.type === "HIGH" && label === "HH") return "HH";
+    if (side === "SHORT" && pivot.type === "LOW" && label === "LL") return "LL";
+    return null;
   }
 
   function linePoints(zz) {
@@ -267,8 +272,8 @@
     if (!raw) return "NEARUSDT";
     var s = String(raw).trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (!s) return "NEARUSDT";
-    if (ALL_COINS.indexOf(s) !== -1) return s;
-    if (ALL_COINS.indexOf(s + "USDT") !== -1) return s + "USDT";
+    if (COINS.indexOf(s) !== -1) return s;
+    if (COINS.indexOf(s + "USDT") !== -1) return s + "USDT";
     return null;
   }
 
@@ -290,7 +295,8 @@
   function readSavedTf() {
     try {
       return normalizeTimeframe(localStorage.getItem(TF_STORAGE_KEY)) ||
-        normalizeTimeframe(localStorage.getItem(TF_STORAGE_KEY_LEGACY));
+        normalizeTimeframe(localStorage.getItem(TF_STORAGE_KEY_LEGACY)) ||
+        normalizeTimeframe(localStorage.getItem("adx-alert-tf"));
     } catch (e) {
       return null;
     }
@@ -309,7 +315,8 @@
     rowsToCandles: rowsToCandles,
     compute: compute,
     signalForPivot: signalForPivot,
-    structureAllows: structureAllows,
+    entrySide: entrySide,
+    structureExitReason: structureExitReason,
     linePoints: linePoints,
     activePoints: activePoints,
     pivotKey: pivotKey,
