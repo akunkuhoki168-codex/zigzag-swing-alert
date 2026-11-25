@@ -31,7 +31,7 @@
   var restSource = "CONNECTING";
   var wsSource = "CONNECTING";
   var loadGen = 0;
-  var chart, candleSeries, zzSeries, zzActiveSeries, slLine, tpLine, zzMarkersApi;
+  var chart, candleSeries, zzSeries, zzActiveSeries, rsiSeries, slLine, tpLine, zzMarkersApi;
   var ws = null;
   var wsRetry = 0;
   var wsTemplateIdx = 0;
@@ -200,6 +200,42 @@
     el.toggleBtn.textContent = paper.engineOn ? "Stop local sandbox" : "Start local sandbox";
   }
 
+  function rsiWilder(candles, period) {
+    period = period || 14;
+    var points = [];
+    if (!candles || candles.length < period + 1) return points;
+    var avgGain = 0;
+    var avgLoss = 0;
+    var i;
+    for (i = 1; i <= period; i++) {
+      var seed = candles[i].close - candles[i - 1].close;
+      if (seed > 0) avgGain += seed;
+      else avgLoss -= seed;
+    }
+    avgGain /= period;
+    avgLoss /= period;
+    function valueOf(gain, loss) {
+      if (loss === 0) return 100;
+      if (gain === 0) return 0;
+      return 100 - 100 / (1 + gain / loss);
+    }
+    points.push({ time: candles[period].time, value: valueOf(avgGain, avgLoss) });
+    for (i = period + 1; i < candles.length; i++) {
+      var change = candles[i].close - candles[i - 1].close;
+      var gain = change > 0 ? change : 0;
+      var loss = change < 0 ? -change : 0;
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      points.push({ time: candles[i].time, value: valueOf(avgGain, avgLoss) });
+    }
+    return points;
+  }
+
+  function latestRsiTitle(points) {
+    if (!points.length) return "RSI 14";
+    return "RSI 14: " + points[points.length - 1].value.toFixed(2);
+  }
+
   function buildChart() {
     if (chart) {
       chart.remove();
@@ -213,6 +249,7 @@
         fontSize: 11,
         fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif',
         attributionLogo: false,
+        panes: { separatorColor: "#2b3139", separatorHoverColor: "rgba(72, 80, 92, 0.35)" },
       },
       grid: {
         vertLines: { color: "#2b3139" },
@@ -262,6 +299,31 @@
       lastValueVisible: false,
       crosshairMarkerVisible: false,
     });
+
+    rsiSeries = chart.addSeries(LC.LineSeries, {
+      color: "#a78bfa",
+      lineWidth: 2,
+      title: "RSI 14",
+      priceLineVisible: false,
+      lastValueVisible: true,
+      priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+      autoscaleInfoProvider: function () {
+        return { priceRange: { minValue: 0, maxValue: 100 } };
+      },
+    }, 1);
+    rsiSeries.createPriceLine({
+      price: 70, color: "#848e9c", lineWidth: 1,
+      lineStyle: LC.LineStyle.Dashed, axisLabelVisible: true, title: "70",
+    });
+    rsiSeries.createPriceLine({
+      price: 30, color: "#848e9c", lineWidth: 1,
+      lineStyle: LC.LineStyle.Dashed, axisLabelVisible: true, title: "30",
+    });
+    var panes = chart.panes();
+    if (panes.length > 1) {
+      panes[0].setStretchFactor(3);
+      panes[1].setStretchFactor(1);
+    }
 
     slLine = null;
     tpLine = null;
@@ -498,6 +560,10 @@
     var zz = Z.compute(Z.rowsToCandles(closedRows), paper.params.reversalPct);
     zzSeries.setData(Z.linePoints(zz));
     zzActiveSeries.setData(Z.activePoints(zz));
+
+    var rsiPoints = rsiWilder(candles, 14);
+    rsiSeries.setData(rsiPoints);
+    rsiSeries.applyOptions({ title: latestRsiTitle(rsiPoints) });
 
     var zzMarks = zz.pivots.filter(function (p) { return p.label; }).map(function (p) {
       var bull = p.label === "HH" || p.label === "HL";
