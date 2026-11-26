@@ -28,10 +28,10 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-26T21:26:45Z",
-  "last_run_at_wib": "2026-11-27 04:26:45 WIB",
+  "last_run_at": "2026-11-26T22:28:48Z",
+  "last_run_at_wib": "2026-11-27 05:28:48 WIB",
   "cash": 188.68375196,
-  "equity": 185.48712464,
+  "equity": 186.66803527,
   "realized_pnl": -11.31624804,
   "positions": {
     "NEARUSDT": null,
@@ -247,18 +247,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795726800,
-    "INJUSDT": 1795726800,
-    "RENDERUSDT": 1795726800,
-    "FETUSDT": 1795726800,
-    "ARBUSDT": 1795726800
+    "NEARUSDT": 1795730400,
+    "INJUSDT": 1795730400,
+    "RENDERUSDT": 1795730400,
+    "FETUSDT": 1795730400,
+    "ARBUSDT": 1795730400
   },
   "last_prices": {
-    "NEARUSDT": 3.093,
-    "INJUSDT": 6.287,
+    "NEARUSDT": 3.066,
+    "INJUSDT": 6.208,
     "RENDERUSDT": 1.333,
-    "FETUSDT": 0.1204,
-    "ARBUSDT": 0.11386
+    "FETUSDT": 0.1197,
+    "ARBUSDT": 0.11411
   },
   "errors": {},
   "events": [
@@ -318,7 +318,8 @@
     "2026-11-26 23:30:12 WIB  CLOSE long ARBUSDT TP @ 0.112432 pnl=2.84",
     "2026-11-27 00:30:16 WIB  SKIP short NEARUSDT HH RSI 50.36 not > 68",
     "2026-11-27 02:32:04 WIB  SKIP short NEARUSDT HH RSI 60.89 not > 68",
-    "2026-11-27 02:32:04 WIB  OPEN short FETUSDT HH @ 0.118600 RSI 69.68 > 68"
+    "2026-11-27 02:32:04 WIB  OPEN short FETUSDT HH @ 0.118600 RSI 69.68 > 68",
+    "2026-11-27 05:28:48 WIB  SKIP short INJUSDT HH RSI 47.69 not > 68"
   ],
   "stats": {
     "trades": 10,
