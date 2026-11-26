@@ -28,10 +28,10 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-26T00:27:40Z",
-  "last_run_at_wib": "2026-11-26 07:27:40 WIB",
+  "last_run_at": "2026-11-26T01:55:10Z",
+  "last_run_at_wib": "2026-11-26 08:55:10 WIB",
   "cash": 204.63901868,
-  "equity": 179.47113319,
+  "equity": 174.73622268,
   "realized_pnl": 4.63901868,
   "positions": {
     "NEARUSDT": {
@@ -156,18 +156,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795651200,
-    "INJUSDT": 1795651200,
-    "RENDERUSDT": 1795651200,
-    "FETUSDT": 1795651200,
-    "ARBUSDT": 1795651200
+    "NEARUSDT": 1795656600,
+    "INJUSDT": 1795656600,
+    "RENDERUSDT": 1795656600,
+    "FETUSDT": 1795656600,
+    "ARBUSDT": 1795656600
   },
   "last_prices": {
     "NEARUSDT": 3.092,
-    "INJUSDT": 6.017,
-    "RENDERUSDT": 1.311,
-    "FETUSDT": 0.1096,
-    "ARBUSDT": 0.11469
+    "INJUSDT": 6.108,
+    "RENDERUSDT": 1.325,
+    "FETUSDT": 0.1117,
+    "ARBUSDT": 0.11394
   },
   "errors": {},
   "events": [
@@ -204,7 +204,8 @@
     "2026-11-26 02:36:12 WIB  OPEN short RENDERUSDT HH @ 1.286000 RSI 71.11 > 68",
     "2026-11-26 03:32:49 WIB  OPEN short NEARUSDT HH @ 2.954000 RSI 72.87 > 68",
     "2026-11-26 07:27:40 WIB  CLOSE short INJUSDT LL @ 5.947000 pnl=-1.04",
-    "2026-11-26 07:27:40 WIB  SKIP long INJUSDT LL RSI 54.52 not < 32"
+    "2026-11-26 07:27:40 WIB  SKIP long INJUSDT LL RSI 54.52 not < 32",
+    "2026-11-26 08:55:10 WIB  SKIP short INJUSDT HH RSI 57.41 not > 68"
   ],
   "stats": {
     "trades": 3,
