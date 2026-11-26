@@ -28,16 +28,30 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-26T18:22:50Z",
-  "last_run_at_wib": "2026-11-27 01:22:50 WIB",
+  "last_run_at": "2026-11-26T19:32:04Z",
+  "last_run_at_wib": "2026-11-27 02:32:04 WIB",
   "cash": 188.68375196,
-  "equity": 188.68375196,
+  "equity": 185.48712464,
   "realized_pnl": -11.31624804,
   "positions": {
     "NEARUSDT": null,
     "INJUSDT": null,
     "RENDERUSDT": null,
-    "FETUSDT": null,
+    "FETUSDT": {
+      "symbol": "FETUSDT",
+      "side": "short",
+      "entry": 0.1186,
+      "qty": 1686.3406408094436,
+      "notional": 200.0,
+      "entry_fee": 0.08,
+      "entry_time": 1795716900,
+      "entry_close_time": 1795717799999,
+      "entry_reason": "HH",
+      "tp": 0.116821,
+      "pivot_time": 1795716900,
+      "pivot_price": 0.1193,
+      "entry_rsi": 69.6763
+    },
     "ARBUSDT": null
   },
   "trades": [
@@ -233,18 +247,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795716000,
-    "INJUSDT": 1795716000,
-    "RENDERUSDT": 1795716000,
-    "FETUSDT": 1795716000,
-    "ARBUSDT": 1795716000
+    "NEARUSDT": 1795720500,
+    "INJUSDT": 1795720500,
+    "RENDERUSDT": 1795720500,
+    "FETUSDT": 1795720500,
+    "ARBUSDT": 1795720500
   },
   "last_prices": {
-    "NEARUSDT": 3.066,
-    "INJUSDT": 6.146,
-    "RENDERUSDT": 1.324,
-    "FETUSDT": 0.1175,
-    "ARBUSDT": 0.11315
+    "NEARUSDT": 3.086,
+    "INJUSDT": 6.246,
+    "RENDERUSDT": 1.331,
+    "FETUSDT": 0.1204,
+    "ARBUSDT": 0.11413
   },
   "errors": {},
   "events": [
@@ -302,7 +316,9 @@
     "2026-11-26 23:30:12 WIB  SKIP long RENDERUSDT LL RSI 47.76 not < 32",
     "2026-11-26 23:30:12 WIB  SKIP short FETUSDT HH RSI 56.61 not > 68",
     "2026-11-26 23:30:12 WIB  CLOSE long ARBUSDT TP @ 0.112432 pnl=2.84",
-    "2026-11-27 00:30:16 WIB  SKIP short NEARUSDT HH RSI 50.36 not > 68"
+    "2026-11-27 00:30:16 WIB  SKIP short NEARUSDT HH RSI 50.36 not > 68",
+    "2026-11-27 02:32:04 WIB  SKIP short NEARUSDT HH RSI 60.89 not > 68",
+    "2026-11-27 02:32:04 WIB  OPEN short FETUSDT HH @ 0.118600 RSI 69.68 > 68"
   ],
   "stats": {
     "trades": 10,
@@ -310,7 +326,7 @@
     "losses": 5,
     "flats": 0,
     "win_rate": 50.0,
-    "open": 0,
+    "open": 1,
     "gross_pnl": -11.31624804
   }
 }
