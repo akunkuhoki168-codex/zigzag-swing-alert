@@ -28,10 +28,10 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-26T22:28:48Z",
-  "last_run_at_wib": "2026-11-27 05:28:48 WIB",
+  "last_run_at": "2026-11-26T23:29:06Z",
+  "last_run_at_wib": "2026-11-27 06:29:06 WIB",
   "cash": 188.68375196,
-  "equity": 186.66803527,
+  "equity": 187.68024437,
   "realized_pnl": -11.31624804,
   "positions": {
     "NEARUSDT": null,
@@ -247,18 +247,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795730400,
-    "INJUSDT": 1795730400,
-    "RENDERUSDT": 1795730400,
-    "FETUSDT": 1795730400,
-    "ARBUSDT": 1795730400
+    "NEARUSDT": 1795734000,
+    "INJUSDT": 1795734000,
+    "RENDERUSDT": 1795734000,
+    "FETUSDT": 1795734000,
+    "ARBUSDT": 1795734000
   },
   "last_prices": {
-    "NEARUSDT": 3.066,
-    "INJUSDT": 6.208,
-    "RENDERUSDT": 1.333,
-    "FETUSDT": 0.1197,
-    "ARBUSDT": 0.11411
+    "NEARUSDT": 3.039,
+    "INJUSDT": 6.149,
+    "RENDERUSDT": 1.329,
+    "FETUSDT": 0.1191,
+    "ARBUSDT": 0.11296
   },
   "errors": {},
   "events": [
