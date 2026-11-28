@@ -28,10 +28,10 @@
   "data_note": "USD-M klines from www.binance.com.",
   "started_at": "2026-11-25T10:46:29Z",
   "started_at_wib": "2026-11-25 17:46:29 WIB",
-  "last_run_at": "2026-11-28T14:29:05Z",
-  "last_run_at_wib": "2026-11-28 21:29:05 WIB",
+  "last_run_at": "2026-11-28T15:21:45Z",
+  "last_run_at_wib": "2026-11-28 22:21:45 WIB",
   "cash": 186.4431334,
-  "equity": 182.89215995,
+  "equity": 183.33446083,
   "realized_pnl": -13.5568666,
   "positions": {
     "NEARUSDT": null,
@@ -361,18 +361,18 @@
     }
   ],
   "last_processed": {
-    "NEARUSDT": 1795874400,
-    "INJUSDT": 1795874400,
-    "RENDERUSDT": 1795874400,
-    "FETUSDT": 1795874400,
-    "ARBUSDT": 1795874400
+    "NEARUSDT": 1795878000,
+    "INJUSDT": 1795878000,
+    "RENDERUSDT": 1795878000,
+    "FETUSDT": 1795878000,
+    "ARBUSDT": 1795878000
   },
   "last_prices": {
-    "NEARUSDT": 2.956,
-    "INJUSDT": 6.144,
-    "RENDERUSDT": 1.333,
+    "NEARUSDT": 2.963,
+    "INJUSDT": 6.183,
+    "RENDERUSDT": 1.336,
     "FETUSDT": 0.1222,
-    "ARBUSDT": 0.11144
+    "ARBUSDT": 0.11162
   },
   "errors": {},
   "events": [
@@ -475,7 +475,8 @@
     "2026-11-28 14:59:10 WIB  SKIP long NEARUSDT LL RSI 50.36 not < 32",
     "2026-11-28 14:59:10 WIB  OPEN long RENDERUSDT LL @ 1.356000 RSI 29.53 < 32",
     "2026-11-28 14:59:10 WIB  SKIP long ARBUSDT LL RSI 40.59 not < 32",
-    "2026-11-28 19:30:28 WIB  SKIP long FETUSDT LL RSI 54.55 not < 32"
+    "2026-11-28 19:30:28 WIB  SKIP long FETUSDT LL RSI 54.55 not < 32",
+    "2026-11-28 22:21:45 WIB  SKIP long NEARUSDT LL RSI 40.54 not < 32"
   ],
   "stats": {
     "trades": 16,
